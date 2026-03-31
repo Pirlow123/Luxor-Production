@@ -388,3 +388,23 @@
 }
 .spec-empty i { font-size:32px; opacity:0.3; }
 .spec-empty p { font-size:14px; }
+
+/* ============================================
+   Companion Virtual Surface
+   ============================================ */
+.comp-btn {
+    position:relative; aspect-ratio:1; border:1px solid rgba(255,255,255,0.1);
+    border-radius:6px; cursor:pointer; display:flex; align-items:center; justify-content:center;
+    font-weight:600; text-align:center; word-break:break-word; padding:4px;
+    transition:transform 80ms, border-color 0.15s, box-shadow 0.15s; overflow:hidden;
+    line-height:1.2; user-select:none; min-height:56px;
+}
+.comp-btn:hover { border-color:rgba(255,255,255,0.3); box-shadow:0 0 8px rgba(255,255,255,0.05); z-index:1; }
+.comp-btn:active, .comp-btn.comp-btn-active {
+    transform:scale(0.92); border-color:var(--accent); box-shadow:0 0 12px rgba(255,59,48,0.3);
+}
+.comp-btn-text { position:relative; z-index:1; max-width:100%; overflow:hidden; text-overflow:ellipsis; }
+.comp-btn-idx {
+    position:absolute; bottom:2px; right:4px; font-size:8px; color:rgba(255,255,255,0.15);
+    font-weight:400; z-index:2;
+}

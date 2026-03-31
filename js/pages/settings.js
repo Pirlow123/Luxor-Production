@@ -1,5 +1,5 @@
 /**
- * Settings Page — Application settings, server management, API configuration
+ * Settings Page — Application settings, server management, API configuration, Companion
  */
 const SettingsPage = {
     _section: 'servers',
@@ -8,10 +8,16 @@ const SettingsPage = {
         return `
             <div class="settings-layout">
                 <div class="settings-nav">
-                    ${['project','servers','api','display','about'].map(s => `
+                    ${['project','servers','api','companion','display','about'].map(s => `
                         <button class="settings-nav-item ${this._section === s ? 'active' : ''}" onclick="SettingsPage.showSection('${s}')">
-                            <i class="fas fa-${s === 'project' ? 'folder-open' : s === 'servers' ? 'server' : s === 'api' ? 'plug' : s === 'display' ? 'desktop' : 'info-circle'}"></i>
-                            <span>${s.charAt(0).toUpperCase() + s.slice(1)}</span>
+                            <i class="fas fa-${
+                                s === 'project' ? 'folder-open' :
+                                s === 'servers' ? 'server' :
+                                s === 'api' ? 'plug' :
+                                s === 'companion' ? 'gamepad' :
+                                s === 'display' ? 'desktop' : 'info-circle'
+                            }"></i>
+                            <span>${s === 'api' ? 'API' : s.charAt(0).toUpperCase() + s.slice(1)}</span>
                         </button>
                     `).join('')}
                 </div>
@@ -26,7 +32,10 @@ const SettingsPage = {
         this._section = s;
         const el = document.getElementById('settings-content');
         if (el) el.innerHTML = this._renderSection();
-        document.querySelectorAll('.settings-nav-item').forEach(b => b.classList.toggle('active', b.textContent.trim().toLowerCase() === s));
+        document.querySelectorAll('.settings-nav-item').forEach(b => {
+            const label = b.textContent.trim().toLowerCase();
+            b.classList.toggle('active', label === s || (s === 'api' && label === 'api'));
+        });
     },
 
     _renderSection() {
@@ -34,6 +43,7 @@ const SettingsPage = {
             case 'project': return this._projectSection();
             case 'servers': return this._serversSection();
             case 'api': return this._apiSection();
+            case 'companion': return this._companionSection();
             case 'display': return this._displaySection();
             case 'about': return this._aboutSection();
             default: return '';
@@ -134,6 +144,242 @@ const SettingsPage = {
         `;
     },
 
+    // ================================================================
+    // COMPANION SECTION
+    // ================================================================
+
+    _companionSection() {
+        const cfg = CompanionAPI.getConfig();
+        const connected = CompanionAPI.isConnected();
+        const version = CompanionAPI._companionVersion;
+
+        return `
+            <div class="card">
+                <div class="card-header">
+                    <h3><i class="fas fa-gamepad"></i> Bitfocus Companion</h3>
+                    <div style="display:flex;align-items:center;gap:8px;">
+                        ${connected
+                            ? UI.badge('Connected' + (version ? ' v' + version : ''), 'green')
+                            : (cfg.enabled ? UI.badge('Connecting...', 'orange') : UI.badge('Disabled', 'red'))}
+                    </div>
+                </div>
+                <div class="card-body">
+                    <p style="color:var(--text-muted);font-size:11px;margin-bottom:16px;">
+                        Connect to Bitfocus Companion via the Satellite API. Luxor registers as a virtual surface
+                        so Companion buttons appear here and presses are sent back to Companion.
+                    </p>
+
+                    <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;padding:10px 14px;background:var(--bg-secondary);border-radius:var(--radius);border:1px solid var(--border);">
+                        <span style="font-size:12px;font-weight:600;">Enable Companion</span>
+                        <div style="flex:1"></div>
+                        <label class="toggle-switch" style="margin:0;">
+                            <input type="checkbox" id="comp-enabled" ${cfg.enabled ? 'checked' : ''} onchange="SettingsPage._companionToggle(this.checked)">
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px;">
+                        <div>
+                            <label style="font-size:10px;text-transform:uppercase;color:var(--text-muted);letter-spacing:0.5px;display:block;margin-bottom:4px;">Companion Host</label>
+                            <input class="form-control" type="text" id="comp-host" value="${UI.esc(cfg.host)}" placeholder="127.0.0.1" style="font-family:monospace;">
+                        </div>
+                        <div>
+                            <label style="font-size:10px;text-transform:uppercase;color:var(--text-muted);letter-spacing:0.5px;display:block;margin-bottom:4px;">WebSocket Port</label>
+                            <input class="form-control" type="number" id="comp-port" value="${cfg.port}" min="1" max="65535" style="font-family:monospace;">
+                        </div>
+                    </div>
+
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px;">
+                        <div>
+                            <label style="font-size:10px;text-transform:uppercase;color:var(--text-muted);letter-spacing:0.5px;display:block;margin-bottom:4px;">Grid Columns</label>
+                            <select class="form-control" id="comp-cols">
+                                ${[4,6,8,10,12].map(n => `<option value="${n}" ${cfg.cols === n ? 'selected' : ''}>${n}</option>`).join('')}
+                            </select>
+                        </div>
+                        <div>
+                            <label style="font-size:10px;text-transform:uppercase;color:var(--text-muted);letter-spacing:0.5px;display:block;margin-bottom:4px;">Grid Rows</label>
+                            <select class="form-control" id="comp-rows">
+                                ${[2,3,4,5,6,8].map(n => `<option value="${n}" ${cfg.rows === n ? 'selected' : ''}>${n}</option>`).join('')}
+                            </select>
+                        </div>
+                    </div>
+
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px;">
+                        <div>
+                            <label style="font-size:10px;text-transform:uppercase;color:var(--text-muted);letter-spacing:0.5px;display:block;margin-bottom:4px;">Device ID</label>
+                            <input class="form-control" type="text" id="comp-deviceid" value="${UI.esc(cfg.deviceId)}" style="font-family:monospace;font-size:11px;">
+                        </div>
+                        <div>
+                            <label style="font-size:10px;text-transform:uppercase;color:var(--text-muted);letter-spacing:0.5px;display:block;margin-bottom:4px;">Device Name</label>
+                            <input class="form-control" type="text" id="comp-devicename" value="${UI.esc(cfg.deviceName)}">
+                        </div>
+                    </div>
+
+                    <div style="display:flex;gap:8px;">
+                        <button class="btn btn-primary" onclick="SettingsPage._companionSave()"><i class="fas fa-save"></i> Save & Connect</button>
+                        <button class="btn" onclick="SettingsPage._companionTest()"><i class="fas fa-sync"></i> Test Connection</button>
+                        ${connected ? `<button class="btn btn-danger" onclick="SettingsPage._companionDisconnect()"><i class="fas fa-unlink"></i> Disconnect</button>` : ''}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Virtual Button Grid -->
+            <div class="card mt-md">
+                <div class="card-header">
+                    <h3><i class="fas fa-th"></i> Virtual Surface</h3>
+                    <span style="font-size:10px;color:var(--text-muted);">${cfg.cols} x ${cfg.rows} (${cfg.cols * cfg.rows} buttons)</span>
+                </div>
+                <div class="card-body" style="padding:12px;">
+                    ${connected
+                        ? this._renderButtonGrid(cfg)
+                        : `<div style="text-align:center;padding:40px;color:var(--text-muted);">
+                            <i class="fas fa-gamepad" style="font-size:32px;opacity:0.2;display:block;margin-bottom:12px;"></i>
+                            <p style="font-size:13px;">Connect to Companion to see your buttons here</p>
+                            <p style="font-size:11px;margin-top:6px;">Make sure Companion is running and the Satellite API is enabled (port ${cfg.port})</p>
+                          </div>`
+                    }
+                </div>
+            </div>
+
+            <!-- Connection Info -->
+            <div class="card mt-md">
+                <div class="card-header"><h3><i class="fas fa-info-circle"></i> Setup Guide</h3></div>
+                <div class="card-body" style="font-size:12px;color:var(--text-secondary);line-height:1.8;">
+                    <p><strong>1.</strong> Open Bitfocus Companion on your network</p>
+                    <p><strong>2.</strong> Go to Companion <strong>Settings</strong> and ensure <strong>Satellite</strong> is enabled</p>
+                    <p><strong>3.</strong> Default Satellite port is <code>16622</code> (TCP) or <code>16623</code> (WebSocket)</p>
+                    <p><strong>4.</strong> Enter the Companion IP above and click <strong>Save & Connect</strong></p>
+                    <p><strong>5.</strong> In Companion's <strong>Surfaces</strong> tab, you'll see <strong>"${UI.esc(cfg.deviceName)}"</strong> as a new surface</p>
+                    <p><strong>6.</strong> Configure buttons in Companion — they'll appear live in the grid above</p>
+                    <p style="margin-top:12px;padding:8px 12px;background:rgba(59,130,246,0.08);border:1px solid rgba(59,130,246,0.2);border-radius:var(--radius-sm);">
+                        <i class="fas fa-lightbulb" style="color:#3b82f6;"></i>
+                        <strong>Tip:</strong> Clicking a button in Luxor sends a press to Companion — same as pressing it on a physical Stream Deck.
+                    </p>
+                </div>
+            </div>
+        `;
+    },
+
+    _renderButtonGrid(cfg) {
+        const buttons = CompanionAPI.getButtons();
+        const total = cfg.cols * cfg.rows;
+        let html = `<div class="comp-grid" style="display:grid;grid-template-columns:repeat(${cfg.cols}, 1fr);gap:4px;">`;
+
+        for (let i = 0; i < total; i++) {
+            const btn = buttons[String(i)];
+            const bgColor = btn ? btn.bgColor : '#1a1a2e';
+            const text = btn ? btn.text : '';
+            const textColor = btn ? btn.textColor : '#555';
+            const fontSize = btn ? Math.min(btn.fontSize, 14) : 10;
+            const hasBitmap = btn && btn.bitmap;
+
+            html += `
+                <button class="comp-btn"
+                        style="background:${bgColor};color:${textColor};font-size:${fontSize}px;"
+                        onmousedown="SettingsPage._companionBtnDown(${i})"
+                        onmouseup="SettingsPage._companionBtnUp(${i})"
+                        onmouseleave="SettingsPage._companionBtnUp(${i})"
+                        title="Button ${i + 1}">
+                    ${hasBitmap
+                        ? `<img src="data:image/png;base64,${btn.bitmap}" style="width:100%;height:100%;object-fit:contain;position:absolute;top:0;left:0;border-radius:6px;">`
+                        : `<span class="comp-btn-text">${UI.esc(text)}</span>`
+                    }
+                    <span class="comp-btn-idx">${i + 1}</span>
+                </button>`;
+        }
+
+        html += '</div>';
+        return html;
+    },
+
+    // ================================================================
+    // COMPANION ACTIONS
+    // ================================================================
+
+    _companionToggle(enabled) {
+        const cfg = CompanionAPI.getConfig();
+        cfg.enabled = enabled;
+        CompanionAPI.updateConfig(cfg);
+        // Re-render to update UI state
+        setTimeout(() => {
+            const el = document.getElementById('settings-content');
+            if (el) el.innerHTML = this._renderSection();
+        }, 500);
+    },
+
+    _companionSave() {
+        const host = document.getElementById('comp-host')?.value?.trim() || '127.0.0.1';
+        const port = parseInt(document.getElementById('comp-port')?.value) || 16623;
+        const cols = parseInt(document.getElementById('comp-cols')?.value) || 8;
+        const rows = parseInt(document.getElementById('comp-rows')?.value) || 4;
+        const deviceId = document.getElementById('comp-deviceid')?.value?.trim() || 'luxor:panel-01';
+        const deviceName = document.getElementById('comp-devicename')?.value?.trim() || 'Luxor Production';
+
+        CompanionAPI.updateConfig({
+            host, port, cols, rows, deviceId, deviceName,
+            enabled: true,
+        });
+
+        UI.toast('Companion settings saved — connecting...', 'info');
+
+        // Re-render after connection attempt
+        setTimeout(() => {
+            const el = document.getElementById('settings-content');
+            if (el) el.innerHTML = this._renderSection();
+
+            if (CompanionAPI.isConnected()) {
+                UI.toast('Connected to Companion!', 'success');
+            }
+        }, 2000);
+    },
+
+    _companionTest() {
+        const host = document.getElementById('comp-host')?.value?.trim() || '127.0.0.1';
+        const port = parseInt(document.getElementById('comp-port')?.value) || 16623;
+
+        UI.toast(`Testing connection to ${host}:${port}...`, 'info');
+
+        const testWs = new WebSocket(`ws://${host}:${port}`);
+        const timeout = setTimeout(() => {
+            testWs.close();
+            UI.toast('Connection timed out — check host/port and that Companion Satellite is enabled', 'error');
+        }, 5000);
+
+        testWs.onopen = () => {
+            clearTimeout(timeout);
+            UI.toast('Connection successful! Companion is reachable.', 'success');
+            testWs.close();
+        };
+
+        testWs.onerror = () => {
+            clearTimeout(timeout);
+            UI.toast('Connection failed — check host/port and that Companion is running', 'error');
+        };
+    },
+
+    _companionDisconnect() {
+        CompanionAPI.updateConfig({ enabled: false });
+        UI.toast('Disconnected from Companion', 'info');
+        const el = document.getElementById('settings-content');
+        if (el) el.innerHTML = this._renderSection();
+    },
+
+    _companionBtnDown(idx) {
+        CompanionAPI.pressButton(idx);
+        const btn = document.querySelectorAll('.comp-btn')[idx];
+        if (btn) btn.classList.add('comp-btn-active');
+    },
+
+    _companionBtnUp(idx) {
+        CompanionAPI.releaseButton(idx);
+        const btn = document.querySelectorAll('.comp-btn')[idx];
+        if (btn) btn.classList.remove('comp-btn-active');
+    },
+
+    // ================================================================
+    // SIDEBAR DISPLAY SETTINGS
+    // ================================================================
+
     _sectionLabels: {
         engines: 'Media Servers',
         ledProcessors: 'LED Processors',
@@ -207,7 +453,6 @@ const SettingsPage = {
         vis[key] = !vis[key];
         try { localStorage.setItem('luxor_sidebar_visibility', JSON.stringify(vis)); } catch {}
         HippoApp.applySidebarVisibility();
-        // Re-render to update toggle state
         const el = document.getElementById('settings-content');
         if (el) el.innerHTML = this._renderSection();
     },
@@ -228,11 +473,9 @@ const SettingsPage = {
         if (idx < 0) return;
         const newIdx = idx + direction;
         if (newIdx < 0 || newIdx >= order.length) return;
-        // Swap
         [order[idx], order[newIdx]] = [order[newIdx], order[idx]];
         try { localStorage.setItem('luxor_sidebar_order', JSON.stringify(order)); } catch {}
         HippoApp.applySidebarVisibility();
-        // Re-render settings to update button states
         const el = document.getElementById('settings-content');
         if (el) el.innerHTML = this._renderSection();
     },
@@ -244,20 +487,18 @@ const SettingsPage = {
                 <div class="card-body" style="text-align:center;padding:32px">
                     <img src="assets/logos/luxor.png" alt="Luxor" style="width:80px;height:80px;margin:0 auto 12px;display:block">
                     <h2 style="font-size:20px;font-weight:800;letter-spacing:2px">LUXOR</h2>
-                    <p style="color:var(--text-muted);font-size:11px;letter-spacing:1px;margin-bottom:16px">MEDIA CONTROLLER</p>
+                    <p style="color:var(--text-muted);font-size:11px;letter-spacing:1px;margin-bottom:16px">PRODUCTION CONTROLLER</p>
                     <p style="color:var(--text-secondary);font-size:12px">
-                        Universal media server control platform.<br>
-                        Supports Hippotizer, Resolume Arena, vMix, CasparCG, OBS Studio,<br>
-                        Barco E2/S3, QLab, Disguise, and Pixera.<br>
-                        LED Processors: Novastar, Megapixel Helios, Brompton Tessera.<br>
-                        Includes PIXL Grid test pattern generator.
+                        Universal production control platform for live events,<br>
+                        broadcast, and AV installations.<br><br>
+                        Media Servers: Hippotizer, Resolume Arena, vMix, CasparCG,<br>
+                        OBS Studio, Barco E2/S3, QLab, Disguise, Pixera, ATEM<br><br>
+                        Production: Power Distribution, Fixture Patch, Truck Packer,<br>
+                        Capture Viewer, Equipment Specifications<br><br>
+                        LED, PTZ, Network, Lighting, Intercom, 3D Visualization
                     </p>
                     <div class="mt-md" style="font-size:11px;color:var(--text-muted)">
-                        <p>API Version: 1.2</p>
-                        <p>Luxor Version: 1.1</p>
-                    </div>
-                    <div style="margin-top:16px;padding:8px 16px;background:rgba(74,184,224,0.1);border:1px solid rgba(74,184,224,0.3);border-radius:var(--radius-md);display:inline-block">
-                        <span style="color:#4CB5E0;font-size:11px;font-weight:600;letter-spacing:0.5px"><i class="fas fa-wrench"></i> WORK IN PROGRESS</span>
+                        <p>Version: 1.3</p>
                     </div>
                 </div>
             </div>
@@ -271,5 +512,19 @@ const SettingsPage = {
         UI.toast(`Poll interval set to ${val}ms`, 'success');
     },
 
-    onActivate() {},
+    onActivate() {
+        // Set up live button updates from Companion
+        CompanionAPI._onButtonUpdate = () => {
+            if (this._section === 'companion') {
+                const el = document.getElementById('settings-content');
+                if (el) el.innerHTML = this._renderSection();
+            }
+        };
+        CompanionAPI._onStateChange = () => {
+            if (this._section === 'companion') {
+                const el = document.getElementById('settings-content');
+                if (el) el.innerHTML = this._renderSection();
+            }
+        };
+    },
 };

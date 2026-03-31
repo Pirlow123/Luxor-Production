@@ -64,6 +64,9 @@ const HippoApp = {
         this.initIntercomSystems();
         this.applySidebarVisibility();
 
+        // Initialize Companion Satellite connection
+        if (typeof CompanionAPI !== 'undefined') CompanionAPI.init();
+
         // Navigate to hash or default
         const hash = location.hash.replace('#', '') || 'dashboard';
         this.navigate(hash);
