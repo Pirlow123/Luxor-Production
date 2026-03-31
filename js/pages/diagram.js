@@ -174,6 +174,15 @@ const DiagramPage = (() => {
     let _diagramName = 'Untitled Diagram';
     let _collapsed = {};  // category collapse state
     let _routeMode = 'ortho'; // 'ortho' (90-degree) or 'curve' (bezier)
+    let _3dMode = false;
+    let _3dScene = null, _3dCamera = null, _3dRenderer = null;
+    let _3dAnimFrame = null;
+    let _3dNodeMeshes = [];   // { nodeId, mesh, sprite }
+    let _3dConnLines = [];    // { connId, line }
+    let _3dOrbit = { theta: Math.PI / 4, phi: Math.PI / 3, radius: 600, target: { x: 0, y: 0, z: 0 } };
+    let _3dDragging = false;
+    let _3dPanning = false;
+    let _3dLastMouse = { x: 0, y: 0 };
 
     // ================================================================
     // CSS
@@ -251,6 +260,13 @@ const DiagramPage = (() => {
 .diagram-zoom .zoom-label{font-size:10px;color:var(--text-muted);padding:4px 6px;min-width:40px;text-align:center;}
 
 .diagram-drop-ghost{position:fixed;pointer-events:none;z-index:9999;opacity:0.8;padding:8px 14px;background:var(--bg-secondary);border:2px solid var(--accent);border-radius:8px;font-size:11px;font-weight:700;color:var(--accent);display:none;white-space:nowrap;box-shadow:0 4px 16px rgba(0,0,0,0.4);}
+
+.diagram-3d-canvas{position:absolute;top:0;left:0;width:100%;height:100%;z-index:5;display:none;}
+.diagram-3d-canvas.active{display:block;}
+.diagram-3d-presets{position:absolute;top:60px;right:12px;z-index:22;display:flex;flex-direction:column;gap:4px;display:none;}
+.diagram-3d-presets.active{display:flex;}
+.diagram-3d-presets button{background:var(--bg-secondary);border:1px solid var(--border);color:var(--text-secondary);cursor:pointer;padding:6px 12px;border-radius:6px;font-size:10px;font-weight:600;transition:all 0.15s;white-space:nowrap;}
+.diagram-3d-presets button:hover{background:rgba(255,255,255,0.08);color:var(--text-primary);border-color:var(--accent);}
 `;
 
     // ================================================================
@@ -283,6 +299,8 @@ const DiagramPage = (() => {
                         <button class="${_snapToGrid ? 'active' : ''}" onclick="DiagramPage.toggleSnap()" title="Toggle Snap"><i class="fas fa-magnet"></i> Snap</button>
                         <button class="${_routeMode === 'ortho' ? 'active' : ''}" onclick="DiagramPage.toggleRoute()" title="Toggle 90° / Curved lines"><i class="fas fa-${_routeMode === 'ortho' ? 'draw-polygon' : 'bezier-curve'}"></i> ${_routeMode === 'ortho' ? '90°' : 'Curve'}</button>
                         <div class="tb-sep"></div>
+                        <button class="${_3dMode ? 'active' : ''}" onclick="DiagramPage.toggle3D()" title="Toggle 3D View"><i class="fas fa-cube"></i> ${_3dMode ? '3D' : '2D'}</button>
+                        <div class="tb-sep"></div>
                         <button onclick="DiagramPage.exportPNG()" title="Export as PNG"><i class="fas fa-image"></i> Export</button>
                         <button onclick="DiagramPage.exportDatasheet()" title="Export Equipment Datasheet"><i class="fas fa-file-alt"></i> Datasheet</button>
                         <button onclick="DiagramPage.pingAllNodes()" title="Ping All Servers"><i class="fas fa-satellite-dish"></i></button>
@@ -294,6 +312,15 @@ const DiagramPage = (() => {
                         ${_showGrid ? '<div class="diagram-grid-bg" id="diagram-grid"></div>' : ''}
                         <svg class="diagram-svg" id="diagram-svg" xmlns="http://www.w3.org/2000/svg"></svg>
                         <div id="diagram-nodes"></div>
+                    </div>
+
+                    <!-- 3D Canvas -->
+                    <canvas class="diagram-3d-canvas ${_3dMode ? 'active' : ''}" id="diagram-3d-canvas"></canvas>
+                    <!-- 3D Camera Presets -->
+                    <div class="diagram-3d-presets ${_3dMode ? 'active' : ''}" id="diagram-3d-presets">
+                        <button onclick="DiagramPage.set3DCamera('perspective')" title="Perspective View"><i class="fas fa-video"></i> Perspective</button>
+                        <button onclick="DiagramPage.set3DCamera('top')" title="Top Down View"><i class="fas fa-arrow-down"></i> Top View</button>
+                        <button onclick="DiagramPage.set3DCamera('front')" title="Front View"><i class="fas fa-arrows-alt-h"></i> Front View</button>
                     </div>
 
                     <!-- Zoom -->
@@ -681,6 +708,10 @@ const DiagramPage = (() => {
         requestAnimationFrame(() => _drawConnections());
         _updateProps();
         _scheduleSave();
+        // Rebuild 3D scene if active
+        if (_3dMode && _3dScene) {
+            _build3DScene();
+        }
     }
 
     function _updateProps() {
@@ -1120,6 +1151,12 @@ const DiagramPage = (() => {
                     ? '<i class="fas fa-draw-polygon"></i> 90°'
                     : '<i class="fas fa-bezier-curve"></i> Curve';
             }
+            if (text.includes('3D') || text.includes('2D')) {
+                btn.className = _3dMode ? 'active' : '';
+                btn.innerHTML = _3dMode
+                    ? '<i class="fas fa-cube"></i> 3D'
+                    : '<i class="fas fa-cube"></i> 2D';
+            }
         });
     }
 
@@ -1172,16 +1209,11 @@ const DiagramPage = (() => {
     // SAVE / LOAD / EXPORT
     // ================================================================
     function saveDiagram() {
-        const name = prompt('Save diagram as:', _diagramName || 'Untitled Diagram');
+        const name = window.luxorProject ? (_diagramName || 'Untitled Diagram') : prompt('Save diagram as:', _diagramName || 'Untitled Diagram');
         if (!name) return;
         _diagramName = name;
         const data = JSON.stringify({ name: _diagramName, nodes: _nodes, connections: _connections, nextId: _nextId, nextConnId: _nextConnId }, null, 2);
-        const blob = new Blob([data], { type: 'application/json' });
-        const a = document.createElement('a');
-        a.href = URL.createObjectURL(blob);
-        a.download = name + '.luxdiagram';
-        a.click();
-        URL.revokeObjectURL(a.href);
+        UI.exportFile(name + '.luxdiagram', data, [{ name: 'Luxor Diagram', extensions: ['luxdiagram'] }]);
         _scheduleSave();
         UI.toast('Diagram saved: ' + name, 'success');
     }
@@ -1354,19 +1386,14 @@ ${_connections.length > 0 ? `
 ` : ''}
 
 <div class="footer">
-    <span>Generated by Luxor Production v1.2 — Diagram Builder</span>
+    <span>Generated by Luxor Production v1.3 — Diagram Builder</span>
     <span>${date} ${time}</span>
 </div>
 </body></html>`;
 
-        const sheetName = prompt('Export datasheet as:', (_diagramName || 'diagram') + '-datasheet');
+        const sheetName = window.luxorProject ? ((_diagramName || 'diagram') + '-datasheet') : prompt('Export datasheet as:', (_diagramName || 'diagram') + '-datasheet');
         if (!sheetName) return;
-        const blob = new Blob([html], { type: 'text/html' });
-        const a = document.createElement('a');
-        a.href = URL.createObjectURL(blob);
-        a.download = sheetName + '.html';
-        a.click();
-        URL.revokeObjectURL(a.href);
+        UI.exportFile(sheetName + '.html', html, [{ name: 'HTML Datasheet', extensions: ['html'] }]);
         UI.toast('Datasheet exported: ' + sheetName + '.html', 'success');
     }
 
@@ -1483,7 +1510,7 @@ ${_connections.length > 0 ? `
         }
 
         // Download
-        const exportName = prompt('Export PNG as:', _diagramName || 'diagram');
+        const exportName = window.luxorProject ? (_diagramName || 'diagram') : prompt('Export PNG as:', _diagramName || 'diagram');
         if (!exportName) return;
         const link = document.createElement('a');
         link.download = exportName + '.png';
@@ -1500,6 +1527,459 @@ ${_connections.length > 0 ? `
         ctx.lineTo(x + r, y + h); ctx.arcTo(x, y + h, x, y + h - r, r);
         ctx.lineTo(x, y + r); ctx.arcTo(x, y, x + r, y, r);
         ctx.closePath();
+    }
+
+    // ================================================================
+    // 3D VIEW — Three.js signal flow visualization
+    // ================================================================
+
+    // Category-to-layer mapping for Y positioning
+    const _3D_CATEGORY_LAYER = {
+        'media': 2,       // Sources at top
+        'video': 1,       // Signal processors middle-high
+        'audio': 1,       // Audio processors middle-high
+        'lighting': 1,    // Lighting middle-high
+        'led': 0,         // LED processors middle
+        'network': 0,     // Network middle
+        'display': -1,    // Outputs at bottom
+    };
+
+    // Signal type color mapping for 3D connections
+    const _3D_SIGNAL_COLORS = {
+        'hdmi': 0x3b82f6,    // Video = blue
+        'sdi': 0x3b82f6,     // Video = blue
+        'audio': 0x22c55e,   // Audio = green
+        'dante': 0x22c55e,   // Audio = green
+        'madi': 0x22c55e,    // Audio = green
+        'aes': 0x22c55e,     // Audio = green
+        'dsnake': 0x22c55e,  // Audio = green
+        'aes50': 0x22c55e,   // Audio = green
+        'dmx': 0xfacc15,     // Control/DMX = yellow
+        'artnet': 0xfacc15,  // Control/DMX = yellow
+        'sacn': 0xfacc15,    // Control/DMX = yellow
+        'eth': 0xf97316,     // Network = orange
+        'ndi': 0xf97316,     // Network = orange
+        'fiber': 0xf97316,   // Network = orange
+        'usb': 0xef4444,     // Power/misc = red
+    };
+
+    function _getCategoryForItem(itemId) {
+        for (const cat of CATEGORIES) {
+            if (cat.items.find(i => i.id === itemId)) return cat.id;
+        }
+        return 'network';
+    }
+
+    function toggle3D() {
+        _3dMode = !_3dMode;
+        const canvas2d = document.getElementById('diagram-canvas');
+        const canvas3d = document.getElementById('diagram-3d-canvas');
+        const presets = document.getElementById('diagram-3d-presets');
+        const legend = document.getElementById('diagram-legend');
+        const zoomCtrl = document.querySelector('.diagram-zoom');
+
+        if (_3dMode) {
+            if (canvas2d) canvas2d.style.display = 'none';
+            if (canvas3d) canvas3d.classList.add('active');
+            if (presets) presets.classList.add('active');
+            if (legend) legend.style.display = 'none';
+            if (zoomCtrl) zoomCtrl.style.display = 'none';
+            _init3D();
+            _build3DScene();
+            _start3DLoop();
+        } else {
+            if (canvas2d) canvas2d.style.display = '';
+            if (canvas3d) canvas3d.classList.remove('active');
+            if (presets) presets.classList.remove('active');
+            if (legend) legend.style.display = '';
+            if (zoomCtrl) zoomCtrl.style.display = '';
+            _stop3DLoop();
+        }
+        _updateToolbarButtons();
+        UI.toast(_3dMode ? '3D View enabled — drag to orbit, scroll to zoom' : '2D View restored', 'info');
+    }
+
+    function _init3D() {
+        if (_3dScene) return; // Already initialized
+        if (typeof THREE === 'undefined') {
+            UI.toast('Three.js not available', 'error');
+            _3dMode = false;
+            return;
+        }
+
+        const container = document.getElementById('diagram-canvas-wrap');
+        const canvas = document.getElementById('diagram-3d-canvas');
+        if (!container || !canvas) return;
+
+        const w = container.clientWidth;
+        const h = container.clientHeight;
+
+        // Scene
+        _3dScene = new THREE.Scene();
+        _3dScene.background = new THREE.Color(0x0f1923);
+        _3dScene.fog = new THREE.FogExp2(0x0f1923, 0.0008);
+
+        // Camera
+        _3dCamera = new THREE.PerspectiveCamera(55, w / h, 1, 5000);
+        _updateCameraFromOrbit();
+
+        // Renderer
+        _3dRenderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
+        _3dRenderer.setSize(w, h);
+        _3dRenderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+        // Lights
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+        _3dScene.add(ambientLight);
+        const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        dirLight.position.set(200, 400, 300);
+        _3dScene.add(dirLight);
+        const pointLight = new THREE.PointLight(0x00d4aa, 0.4, 1200);
+        pointLight.position.set(0, 200, 0);
+        _3dScene.add(pointLight);
+
+        // Ground grid
+        const gridHelper = new THREE.GridHelper(1200, 40, 0x1a2736, 0x1a2736);
+        gridHelper.position.y = -150;
+        _3dScene.add(gridHelper);
+
+        // Manual orbit controls via mouse events on canvas
+        canvas.addEventListener('mousedown', _on3DMouseDown);
+        canvas.addEventListener('mousemove', _on3DMouseMove);
+        canvas.addEventListener('mouseup', _on3DMouseUp);
+        canvas.addEventListener('mouseleave', _on3DMouseUp);
+        canvas.addEventListener('wheel', _on3DWheel, { passive: false });
+        canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+
+        // Handle resize
+        window.addEventListener('resize', _on3DResize);
+    }
+
+    function _on3DResize() {
+        if (!_3dRenderer || !_3dCamera) return;
+        const container = document.getElementById('diagram-canvas-wrap');
+        if (!container) return;
+        const w = container.clientWidth;
+        const h = container.clientHeight;
+        _3dCamera.aspect = w / h;
+        _3dCamera.updateProjectionMatrix();
+        _3dRenderer.setSize(w, h);
+    }
+
+    function _on3DMouseDown(e) {
+        if (e.button === 0) { // Left click = orbit
+            _3dDragging = true;
+        } else if (e.button === 2) { // Right click = pan
+            _3dPanning = true;
+        }
+        _3dLastMouse = { x: e.clientX, y: e.clientY };
+    }
+
+    function _on3DMouseMove(e) {
+        if (!_3dDragging && !_3dPanning) return;
+        const dx = e.clientX - _3dLastMouse.x;
+        const dy = e.clientY - _3dLastMouse.y;
+        _3dLastMouse = { x: e.clientX, y: e.clientY };
+
+        if (_3dDragging) {
+            // Orbit: adjust spherical coordinates
+            _3dOrbit.theta -= dx * 0.005;
+            _3dOrbit.phi = Math.max(0.1, Math.min(Math.PI - 0.1, _3dOrbit.phi - dy * 0.005));
+            _updateCameraFromOrbit();
+        }
+        if (_3dPanning) {
+            // Pan: move target in camera-local XY plane
+            const panSpeed = _3dOrbit.radius * 0.001;
+            const right = new THREE.Vector3();
+            const up = new THREE.Vector3();
+            _3dCamera.getWorldDirection(new THREE.Vector3());
+            right.crossVectors(_3dCamera.up, new THREE.Vector3().subVectors(_3dOrbit.target, _3dCamera.position).normalize()).normalize();
+            up.copy(_3dCamera.up);
+            _3dOrbit.target.x += (-dx * panSpeed * right.x + dy * panSpeed * up.x);
+            _3dOrbit.target.y += (-dx * panSpeed * right.y + dy * panSpeed * up.y);
+            _3dOrbit.target.z += (-dx * panSpeed * right.z + dy * panSpeed * up.z);
+            _updateCameraFromOrbit();
+        }
+    }
+
+    function _on3DMouseUp() {
+        _3dDragging = false;
+        _3dPanning = false;
+    }
+
+    function _on3DWheel(e) {
+        e.preventDefault();
+        const delta = e.deltaY > 0 ? 1.08 : 0.92;
+        _3dOrbit.radius = Math.max(100, Math.min(2000, _3dOrbit.radius * delta));
+        _updateCameraFromOrbit();
+    }
+
+    function _updateCameraFromOrbit() {
+        if (!_3dCamera) return;
+        const t = _3dOrbit.target;
+        _3dCamera.position.set(
+            t.x + _3dOrbit.radius * Math.sin(_3dOrbit.phi) * Math.cos(_3dOrbit.theta),
+            t.y + _3dOrbit.radius * Math.cos(_3dOrbit.phi),
+            t.z + _3dOrbit.radius * Math.sin(_3dOrbit.phi) * Math.sin(_3dOrbit.theta)
+        );
+        _3dCamera.lookAt(t.x, t.y, t.z);
+    }
+
+    function set3DCamera(preset) {
+        switch (preset) {
+            case 'top':
+                _3dOrbit.theta = 0;
+                _3dOrbit.phi = 0.15;
+                _3dOrbit.radius = 800;
+                break;
+            case 'front':
+                _3dOrbit.theta = 0;
+                _3dOrbit.phi = Math.PI / 2;
+                _3dOrbit.radius = 700;
+                break;
+            case 'perspective':
+            default:
+                _3dOrbit.theta = Math.PI / 4;
+                _3dOrbit.phi = Math.PI / 3;
+                _3dOrbit.radius = 600;
+                break;
+        }
+        _3dOrbit.target = { x: 0, y: 0, z: 0 };
+        _updateCameraFromOrbit();
+        UI.toast('Camera: ' + preset.charAt(0).toUpperCase() + preset.slice(1) + ' view', 'info');
+    }
+
+    function _build3DScene() {
+        if (!_3dScene) return;
+
+        // Remove old meshes
+        _3dNodeMeshes.forEach(obj => {
+            _3dScene.remove(obj.mesh);
+            if (obj.sprite) _3dScene.remove(obj.sprite);
+        });
+        _3dConnLines.forEach(obj => _3dScene.remove(obj.line));
+        _3dNodeMeshes = [];
+        _3dConnLines = [];
+
+        if (_nodes.length === 0) return;
+
+        // Group nodes by category for Y layering
+        const catGroups = {};
+        _nodes.forEach(node => {
+            const catId = _getCategoryForItem(node.itemId);
+            if (!catGroups[catId]) catGroups[catId] = [];
+            catGroups[catId].push(node);
+        });
+
+        // Position nodes in 3D: X = spread within category, Y = layer, Z = slight depth variance
+        const nodePositions = {}; // nodeId -> THREE.Vector3
+        const boxW = 60, boxH = 30, boxD = 20;
+        const layerSpacing = 120;
+        const nodeSpacing = 100;
+
+        Object.entries(catGroups).forEach(([catId, catNodes]) => {
+            const layer = _3D_CATEGORY_LAYER[catId] !== undefined ? _3D_CATEGORY_LAYER[catId] : 0;
+            const yPos = layer * layerSpacing;
+            const totalWidth = (catNodes.length - 1) * nodeSpacing;
+            const startX = -totalWidth / 2;
+
+            catNodes.forEach((node, i) => {
+                const xPos = startX + i * nodeSpacing;
+                const zPos = (Math.random() - 0.5) * 40; // slight Z variance for depth
+                const pos = new THREE.Vector3(xPos, yPos, zPos);
+                nodePositions[node.id] = pos;
+
+                // Create box
+                const geometry = new THREE.BoxGeometry(boxW, boxH, boxD);
+                const color = new THREE.Color(node.color);
+                const material = new THREE.MeshPhongMaterial({
+                    color: color,
+                    emissive: color.clone().multiplyScalar(0.15),
+                    transparent: true,
+                    opacity: 0.85,
+                    shininess: 60,
+                });
+                const mesh = new THREE.Mesh(geometry, material);
+                mesh.position.copy(pos);
+
+                // Edge outline
+                const edges = new THREE.EdgesGeometry(geometry);
+                const lineMat = new THREE.LineBasicMaterial({ color: node.color, transparent: true, opacity: 0.5 });
+                const wireframe = new THREE.LineSegments(edges, lineMat);
+                mesh.add(wireframe);
+
+                _3dScene.add(mesh);
+
+                // Sprite text label
+                const sprite = _makeTextSprite(node.label, {
+                    fontsize: 28,
+                    color: '#e2e8f0',
+                    bgColor: 'rgba(15,25,35,0.8)',
+                    borderColor: node.color,
+                });
+                sprite.position.set(pos.x, pos.y + boxH / 2 + 14, pos.z);
+                sprite.scale.set(80, 24, 1);
+                _3dScene.add(sprite);
+
+                _3dNodeMeshes.push({ nodeId: node.id, mesh, sprite });
+            });
+        });
+
+        // Build connections as 3D curved lines
+        _connections.forEach(conn => {
+            const fromPos = nodePositions[conn.fromNode];
+            const toPos = nodePositions[conn.toNode];
+            if (!fromPos || !toPos) return;
+
+            const signalColor = _3D_SIGNAL_COLORS[conn.cableType] || 0xf97316;
+
+            // Create curved path using CatmullRomCurve3
+            const mid = new THREE.Vector3().addVectors(fromPos, toPos).multiplyScalar(0.5);
+            // Lift midpoint for nice arc
+            const dist = fromPos.distanceTo(toPos);
+            mid.y += dist * 0.2;
+            // Add slight lateral offset to prevent overlapping parallel cables
+            mid.z += (Math.random() - 0.5) * 20;
+
+            const curve = new THREE.CatmullRomCurve3([
+                fromPos.clone().add(new THREE.Vector3(0, -boxH * 0.3, 0)),
+                new THREE.Vector3(fromPos.x + (mid.x - fromPos.x) * 0.3, fromPos.y + (mid.y - fromPos.y) * 0.6, fromPos.z + (mid.z - fromPos.z) * 0.3),
+                mid,
+                new THREE.Vector3(toPos.x + (mid.x - toPos.x) * 0.3, toPos.y + (mid.y - toPos.y) * 0.6, toPos.z + (mid.z - toPos.z) * 0.3),
+                toPos.clone().add(new THREE.Vector3(0, -boxH * 0.3, 0)),
+            ]);
+
+            const points = curve.getPoints(40);
+            const geometry = new THREE.BufferGeometry().setFromPoints(points);
+            const material = new THREE.LineBasicMaterial({
+                color: signalColor,
+                transparent: true,
+                opacity: 0.7,
+                linewidth: 2,
+            });
+            const line = new THREE.Line(geometry, material);
+            _3dScene.add(line);
+            _3dConnLines.push({ connId: conn.id, line });
+
+            // Small sphere at each end for visual anchoring
+            const endGeo = new THREE.SphereGeometry(3, 8, 8);
+            const endMat = new THREE.MeshBasicMaterial({ color: signalColor });
+            const startSphere = new THREE.Mesh(endGeo, endMat);
+            startSphere.position.copy(points[0]);
+            _3dScene.add(startSphere);
+            const endSphere = new THREE.Mesh(endGeo.clone(), endMat.clone());
+            endSphere.position.copy(points[points.length - 1]);
+            _3dScene.add(endSphere);
+        });
+
+        // Auto-center camera target on the centroid of all nodes
+        if (Object.keys(nodePositions).length > 0) {
+            const centroid = new THREE.Vector3();
+            const positions = Object.values(nodePositions);
+            positions.forEach(p => centroid.add(p));
+            centroid.divideScalar(positions.length);
+            _3dOrbit.target = { x: centroid.x, y: centroid.y, z: centroid.z };
+            _updateCameraFromOrbit();
+        }
+    }
+
+    function _makeTextSprite(text, opts) {
+        opts = opts || {};
+        const fontsize = opts.fontsize || 24;
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        ctx.font = 'Bold ' + fontsize + 'px Inter, Segoe UI, sans-serif';
+        const metrics = ctx.measureText(text);
+        const textW = metrics.width;
+        const padding = 12;
+        canvas.width = textW + padding * 2;
+        canvas.height = fontsize + padding * 2;
+
+        // Background
+        if (opts.bgColor) {
+            ctx.fillStyle = opts.bgColor;
+            _roundRectCanvas(ctx, 0, 0, canvas.width, canvas.height, 6);
+            ctx.fill();
+        }
+        // Border
+        if (opts.borderColor) {
+            ctx.strokeStyle = opts.borderColor;
+            ctx.lineWidth = 2;
+            _roundRectCanvas(ctx, 1, 1, canvas.width - 2, canvas.height - 2, 5);
+            ctx.stroke();
+        }
+        // Text
+        ctx.font = 'Bold ' + fontsize + 'px Inter, Segoe UI, sans-serif';
+        ctx.fillStyle = opts.color || '#ffffff';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(text, canvas.width / 2, canvas.height / 2);
+
+        const texture = new THREE.CanvasTexture(canvas);
+        texture.minFilter = THREE.LinearFilter;
+        const spriteMat = new THREE.SpriteMaterial({ map: texture, transparent: true, depthTest: false });
+        const sprite = new THREE.Sprite(spriteMat);
+        sprite.renderOrder = 999;
+        return sprite;
+    }
+
+    function _roundRectCanvas(ctx, x, y, w, h, r) {
+        ctx.beginPath();
+        ctx.moveTo(x + r, y);
+        ctx.lineTo(x + w - r, y); ctx.arcTo(x + w, y, x + w, y + r, r);
+        ctx.lineTo(x + w, y + h - r); ctx.arcTo(x + w, y + h, x + w - r, y + h, r);
+        ctx.lineTo(x + r, y + h); ctx.arcTo(x, y + h, x, y + h - r, r);
+        ctx.lineTo(x, y + r); ctx.arcTo(x, y, x + r, y, r);
+        ctx.closePath();
+    }
+
+    function _start3DLoop() {
+        if (_3dAnimFrame) return;
+        function animate() {
+            _3dAnimFrame = requestAnimationFrame(animate);
+            if (_3dRenderer && _3dScene && _3dCamera) {
+                _3dRenderer.render(_3dScene, _3dCamera);
+            }
+        }
+        animate();
+    }
+
+    function _stop3DLoop() {
+        if (_3dAnimFrame) {
+            cancelAnimationFrame(_3dAnimFrame);
+            _3dAnimFrame = null;
+        }
+    }
+
+    function _dispose3D() {
+        _stop3DLoop();
+        if (_3dScene) {
+            // Traverse and dispose geometries/materials
+            _3dScene.traverse(obj => {
+                if (obj.geometry) obj.geometry.dispose();
+                if (obj.material) {
+                    if (obj.material.map) obj.material.map.dispose();
+                    obj.material.dispose();
+                }
+            });
+        }
+        if (_3dRenderer) {
+            _3dRenderer.dispose();
+            const canvas = document.getElementById('diagram-3d-canvas');
+            if (canvas) {
+                canvas.removeEventListener('mousedown', _on3DMouseDown);
+                canvas.removeEventListener('mousemove', _on3DMouseMove);
+                canvas.removeEventListener('mouseup', _on3DMouseUp);
+                canvas.removeEventListener('mouseleave', _on3DMouseUp);
+                canvas.removeEventListener('wheel', _on3DWheel);
+            }
+            window.removeEventListener('resize', _on3DResize);
+        }
+        _3dScene = null;
+        _3dCamera = null;
+        _3dRenderer = null;
+        _3dNodeMeshes = [];
+        _3dConnLines = [];
     }
 
     // ================================================================
@@ -1528,6 +2008,8 @@ ${_connections.length > 0 ? `
         document.removeEventListener('mousemove', _onMouseMove);
         document.removeEventListener('mouseup', _onMouseUp);
         document.removeEventListener('keydown', _onKeyDown);
+        _dispose3D();
+        _3dMode = false;
     }
 
     // ================================================================
@@ -1628,6 +2110,9 @@ ${_connections.length > 0 ? `
         loadDiagram,
         exportPNG,
         exportDatasheet,
+        // 3D
+        toggle3D,
+        set3DCamera,
     };
 
 })();

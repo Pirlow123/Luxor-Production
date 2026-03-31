@@ -106,4 +106,22 @@ const UI = {
     },
 
     debounce(fn, ms) { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; },
+
+    async exportFile(defaultName, content, filters) {
+        // Use Electron native save dialog if available
+        if (window.luxorProject?.exportFile) {
+            const result = await window.luxorProject.exportFile(defaultName, content, filters);
+            if (result.ok) UI.toast('Exported to ' + result.path, 'success');
+            return result.ok;
+        }
+        // Fallback: browser blob download
+        const blob = new Blob([content], { type: 'application/octet-stream' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = defaultName;
+        a.click();
+        URL.revokeObjectURL(url);
+        return true;
+    },
 };

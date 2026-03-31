@@ -14,44 +14,44 @@ const LedProcessorPage = {
     // All supported Novastar processor models grouped by line
     _models: {
         'COEX': [
-            { id: 'CX40 Pro', name: 'CX40 Pro', api: 'http', port: 8001, desc: '4-port Ethernet, 4K@60Hz', icon: 'fa-microchip' },
-            { id: 'CX80 Pro', name: 'CX80 Pro', api: 'http', port: 8001, desc: '8-port Ethernet, 8K processing', icon: 'fa-microchip' },
-            { id: 'MX40 Pro', name: 'MX40 Pro', api: 'http', port: 8001, desc: '4-port, HDR10, 7680×4320', icon: 'fa-microchip' },
-            { id: 'MX40 Pro S', name: 'MX40 Pro S', api: 'http', port: 8001, desc: '4-port, compact touring', icon: 'fa-microchip' },
+            { id: 'CX40 Pro', name: 'CX40 Pro', api: 'http', port: 8001, desc: '4-port Ethernet, 4K@60Hz', icon: 'fa-microchip', hasScaler: true, hasHDR: true, hasGenlock: true, hasMediaPlayer: false, role: 'processor' },
+            { id: 'CX80 Pro', name: 'CX80 Pro', api: 'http', port: 8001, desc: '8-port Ethernet, 8K processing', icon: 'fa-microchip', hasScaler: true, hasHDR: true, hasGenlock: true, hasMediaPlayer: false, role: 'processor' },
+            { id: 'MX40 Pro', name: 'MX40 Pro', api: 'http', port: 8001, desc: '4-port, HDR10, 7680×4320', icon: 'fa-microchip', hasScaler: true, hasHDR: true, hasGenlock: true, hasMediaPlayer: false, role: 'processor' },
+            { id: 'MX40 Pro S', name: 'MX40 Pro S', api: 'http', port: 8001, desc: '4-port, compact touring', icon: 'fa-microchip', hasScaler: true, hasHDR: true, hasGenlock: true, hasMediaPlayer: false, role: 'processor' },
         ],
         'VX Series': [
-            { id: 'VX1000', name: 'VX1000', api: 'http', port: 8001, desc: '10x Ethernet, 10.4M pixels', icon: 'fa-server' },
-            { id: 'VX600', name: 'VX600', api: 'http', port: 8001, desc: '6x Ethernet, 3.9M pixels', icon: 'fa-server' },
-            { id: 'VX400', name: 'VX400', api: 'http', port: 8001, desc: '4x Ethernet, 2.6M pixels', icon: 'fa-server' },
-            { id: 'VX200', name: 'VX200', api: 'http', port: 8001, desc: '2x Ethernet, 1.3M pixels', icon: 'fa-server' },
+            { id: 'VX1000', name: 'VX1000', api: 'http', port: 8001, desc: '10x Ethernet, 10.4M pixels', icon: 'fa-server', hasScaler: true, hasHDR: true, hasGenlock: true, hasMediaPlayer: false, role: 'processor' },
+            { id: 'VX600', name: 'VX600', api: 'http', port: 8001, desc: '6x Ethernet, 3.9M pixels', icon: 'fa-server', hasScaler: true, hasHDR: true, hasGenlock: true, hasMediaPlayer: false, role: 'processor' },
+            { id: 'VX400', name: 'VX400', api: 'http', port: 8001, desc: '4x Ethernet, 2.6M pixels', icon: 'fa-server', hasScaler: true, hasHDR: false, hasGenlock: true, hasMediaPlayer: false, role: 'processor' },
+            { id: 'VX200', name: 'VX200', api: 'http', port: 8001, desc: '2x Ethernet, 1.3M pixels', icon: 'fa-server', hasScaler: true, hasHDR: false, hasGenlock: false, hasMediaPlayer: false, role: 'processor' },
         ],
         'NovaPro': [
-            { id: 'NovaPro UHD Jr', name: 'NovaPro UHD Jr', api: 'http', port: 8001, desc: 'All-in-one 4K processor', icon: 'fa-tv' },
-            { id: 'NovaPro UHD', name: 'NovaPro UHD', api: 'http', port: 8001, desc: 'Flagship 4K HDR processor', icon: 'fa-tv' },
-            { id: 'NovaPro HD', name: 'NovaPro HD', api: 'http', port: 8001, desc: 'Full HD processor', icon: 'fa-tv' },
+            { id: 'NovaPro UHD Jr', name: 'NovaPro UHD Jr', api: 'http', port: 8001, desc: 'All-in-one 4K processor', icon: 'fa-tv', hasScaler: true, hasHDR: true, hasGenlock: true, hasMediaPlayer: false, role: 'processor' },
+            { id: 'NovaPro UHD', name: 'NovaPro UHD', api: 'http', port: 8001, desc: 'Flagship 4K HDR processor', icon: 'fa-tv', hasScaler: true, hasHDR: true, hasGenlock: true, hasMediaPlayer: false, role: 'processor' },
+            { id: 'NovaPro HD', name: 'NovaPro HD', api: 'http', port: 8001, desc: 'Full HD processor', icon: 'fa-tv', hasScaler: true, hasHDR: false, hasGenlock: true, hasMediaPlayer: false, role: 'processor' },
         ],
         'MCTRL': [
-            { id: 'MCTRL 4K', name: 'MCTRL 4K', api: 'tcp', port: 5200, desc: '4K controller, 16x Ethernet + Fiber', icon: 'fa-hdd' },
-            { id: 'MCTRL R5', name: 'MCTRL R5', api: 'tcp', port: 5200, desc: '16x Ethernet, fiber output', icon: 'fa-hdd' },
-            { id: 'MCTRL 660', name: 'MCTRL 660', api: 'tcp', port: 5200, desc: '6x Ethernet, 1.95M pixels', icon: 'fa-hdd' },
-            { id: 'MCTRL 660 Pro', name: 'MCTRL 660 Pro', api: 'tcp', port: 5200, desc: '6x Ethernet, HDR10, 3.9M', icon: 'fa-hdd' },
-            { id: 'MCTRL 600', name: 'MCTRL 600', api: 'tcp', port: 5200, desc: '6x Ethernet, basic controller', icon: 'fa-hdd' },
-            { id: 'MCTRL 300', name: 'MCTRL 300', api: 'tcp', port: 5200, desc: '1x Ethernet, entry-level', icon: 'fa-hdd' },
+            { id: 'MCTRL 4K', name: 'MCTRL 4K', api: 'tcp', port: 5200, desc: '4K sending controller, 16x Ethernet + Fiber', icon: 'fa-hdd', hasScaler: false, hasHDR: true, hasGenlock: true, hasMediaPlayer: false, role: 'sender' },
+            { id: 'MCTRL R5', name: 'MCTRL R5', api: 'tcp', port: 5200, desc: '16x Ethernet, fiber output', icon: 'fa-hdd', hasScaler: false, hasHDR: true, hasGenlock: true, hasMediaPlayer: false, role: 'sender' },
+            { id: 'MCTRL 660', name: 'MCTRL 660', api: 'tcp', port: 5200, desc: '6x Ethernet, 1.95M pixels', icon: 'fa-hdd', hasScaler: false, hasHDR: false, hasGenlock: false, hasMediaPlayer: false, role: 'sender' },
+            { id: 'MCTRL 660 Pro', name: 'MCTRL 660 Pro', api: 'tcp', port: 5200, desc: '6x Ethernet, HDR10, 3.9M', icon: 'fa-hdd', hasScaler: false, hasHDR: true, hasGenlock: true, hasMediaPlayer: false, role: 'sender' },
+            { id: 'MCTRL 600', name: 'MCTRL 600', api: 'tcp', port: 5200, desc: '6x Ethernet, basic sending controller', icon: 'fa-hdd', hasScaler: false, hasHDR: false, hasGenlock: false, hasMediaPlayer: false, role: 'sender' },
+            { id: 'MCTRL 300', name: 'MCTRL 300', api: 'tcp', port: 5200, desc: '1x Ethernet, entry-level sender', icon: 'fa-hdd', hasScaler: false, hasHDR: false, hasGenlock: false, hasMediaPlayer: false, role: 'sender' },
         ],
         'J Series': [
-            { id: 'J6', name: 'J6', api: 'http', port: 8001, desc: '6-port multimedia player', icon: 'fa-play-circle' },
-            { id: 'JX1', name: 'JX1', api: 'http', port: 8001, desc: 'Compact multimedia player', icon: 'fa-play-circle' },
+            { id: 'J6', name: 'J6', api: 'http', port: 8001, desc: '6-port multimedia player + sender', icon: 'fa-play-circle', hasScaler: false, hasHDR: true, hasGenlock: false, hasMediaPlayer: true, role: 'player' },
+            { id: 'JX1', name: 'JX1', api: 'http', port: 8001, desc: 'Compact multimedia player + sender', icon: 'fa-play-circle', hasScaler: false, hasHDR: false, hasGenlock: false, hasMediaPlayer: true, role: 'player' },
         ],
         'Megapixel': [
-            { id: 'Helios', name: 'Helios', api: 'http', port: 80, desc: '8-port, 4K60, HDR, 10-bit LED processor', icon: 'fa-sun', brand: 'megapixel' },
+            { id: 'Helios', name: 'Helios', api: 'http', port: 80, desc: '8-port, 4K60, HDR, 10-bit LED processor', icon: 'fa-sun', brand: 'megapixel', hasScaler: true, hasHDR: true, hasGenlock: true, hasMediaPlayer: false, role: 'processor' },
         ],
         'Brompton': [
-            { id: 'Tessera SX40', name: 'Tessera SX40', api: 'http', port: 80, desc: '4-port, 4K, flagship processor', icon: 'fa-gem', brand: 'brompton' },
-            { id: 'Tessera S8', name: 'Tessera S8', api: 'http', port: 80, desc: '8-port, 4K@60Hz, HDR', icon: 'fa-gem', brand: 'brompton' },
-            { id: 'Tessera S4', name: 'Tessera S4', api: 'http', port: 80, desc: '4-port, compact touring processor', icon: 'fa-gem', brand: 'brompton' },
-            { id: 'Tessera XD', name: 'Tessera XD', api: 'http', port: 80, desc: '10-bit, extended data processor', icon: 'fa-gem', brand: 'brompton' },
-            { id: 'Tessera T1', name: 'Tessera T1', api: 'http', port: 80, desc: '1-port, single link processor', icon: 'fa-gem', brand: 'brompton' },
-            { id: 'Tessera R2', name: 'Tessera R2', api: 'http', port: 80, desc: 'Receiver card with 2 outputs', icon: 'fa-gem', brand: 'brompton' },
+            { id: 'Tessera SX40', name: 'Tessera SX40', api: 'http', port: 80, desc: '4-port, 4K, flagship processor', icon: 'fa-gem', brand: 'brompton', hasScaler: true, hasHDR: true, hasGenlock: true, hasMediaPlayer: false, role: 'processor' },
+            { id: 'Tessera S8', name: 'Tessera S8', api: 'http', port: 80, desc: '8-port, 4K@60Hz, HDR', icon: 'fa-gem', brand: 'brompton', hasScaler: true, hasHDR: true, hasGenlock: true, hasMediaPlayer: false, role: 'processor' },
+            { id: 'Tessera S4', name: 'Tessera S4', api: 'http', port: 80, desc: '4-port, compact touring processor', icon: 'fa-gem', brand: 'brompton', hasScaler: true, hasHDR: false, hasGenlock: true, hasMediaPlayer: false, role: 'processor' },
+            { id: 'Tessera XD', name: 'Tessera XD', api: 'http', port: 80, desc: '10-bit, extended data processor', icon: 'fa-gem', brand: 'brompton', hasScaler: true, hasHDR: true, hasGenlock: true, hasMediaPlayer: false, role: 'processor' },
+            { id: 'Tessera T1', name: 'Tessera T1', api: 'http', port: 80, desc: '1-port, single link processor', icon: 'fa-gem', brand: 'brompton', hasScaler: false, hasHDR: false, hasGenlock: false, hasMediaPlayer: false, role: 'processor' },
+            { id: 'Tessera R2', name: 'Tessera R2', api: 'http', port: 80, desc: 'Receiver card with 2 outputs', icon: 'fa-gem', brand: 'brompton', hasScaler: false, hasHDR: false, hasGenlock: false, hasMediaPlayer: false, role: 'receiver' },
         ],
     },
 
@@ -537,8 +537,17 @@ const LedProcessorPage = {
     // NOVASTAR — unique features
     // ================================================================
     _renderNovastarCards(s) {
-        return `
-            <!-- Scaling & Mapping -->
+        const proc = this._selected;
+        const modelInfo = proc ? this._getModelInfo(proc.model) : null;
+        const hasScaler = modelInfo?.hasScaler !== false;
+        const hasMediaPlayer = modelInfo?.hasMediaPlayer === true;
+        const role = modelInfo?.role || 'processor';
+
+        let html = '';
+
+        // Scaling card — only for processors with built-in scalers (NOT MCTRL senders or J Series players)
+        if (hasScaler) {
+            html += `
             <div class="led-card">
                 <div class="led-card-head"><i class="fas fa-expand-arrows-alt"></i> Scaling & Mapping</div>
                 <div class="led-card-body">
@@ -559,9 +568,55 @@ const LedProcessorPage = {
                         </div>
                     </div>
                 </div>
-            </div>
+            </div>`;
+        }
 
-            <!-- Cabinet / Calibration -->
+        // Sending controller info card — for MCTRL series
+        if (role === 'sender') {
+            html += `
+            <div class="led-card">
+                <div class="led-card-head"><i class="fas fa-arrow-right"></i> Sending Controller</div>
+                <div class="led-card-body">
+                    <div class="led-output-info">
+                        <div class="led-out-row">
+                            <span class="text-muted">Role</span>
+                            <span style="color:var(--accent);font-weight:600;">Sending Controller</span>
+                        </div>
+                        <div class="led-out-row">
+                            <span class="text-muted">Note</span>
+                            <span class="text-muted" style="font-size:10px;">No built-in scaler — requires external video source at native resolution</span>
+                        </div>
+                    </div>
+                </div>
+            </div>`;
+        }
+
+        // Media player card — for J Series
+        if (hasMediaPlayer) {
+            html += `
+            <div class="led-card">
+                <div class="led-card-head"><i class="fas fa-play-circle"></i> Media Player</div>
+                <div class="led-card-body">
+                    <div class="led-output-info">
+                        <div class="led-out-row">
+                            <span class="text-muted">Role</span>
+                            <span style="color:var(--accent);font-weight:600;">Multimedia Player + Sender</span>
+                        </div>
+                        <div class="led-out-row">
+                            <span class="text-muted">Internal Playback</span>
+                            <span class="mono" style="color:#4ade80;">Supported</span>
+                        </div>
+                        <div class="led-out-row">
+                            <span class="text-muted">Note</span>
+                            <span class="text-muted" style="font-size:10px;">Built-in media playback via USB/network — no external scaler</span>
+                        </div>
+                    </div>
+                </div>
+            </div>`;
+        }
+
+        // Calibration card — all Novastar models
+        html += `
             <div class="led-card">
                 <div class="led-card-head"><i class="fas fa-wrench"></i> Calibration</div>
                 <div class="led-card-body">
@@ -585,9 +640,10 @@ const LedProcessorPage = {
                         </button>
                     </div>
                 </div>
-            </div>
+            </div>`;
 
-            <!-- Ethernet Port Status -->
+        // Port Status card — all Novastar models
+        html += `
             <div class="led-card">
                 <div class="led-card-head"><i class="fas fa-ethernet"></i> Port Status</div>
                 <div class="led-card-body">
@@ -600,8 +656,9 @@ const LedProcessorPage = {
                         `).join('')}
                     </div>
                 </div>
-            </div>
-        `;
+            </div>`;
+
+        return html;
     },
 
     _patternColor(pat) {

@@ -271,6 +271,240 @@ class ObsAPI {
     async triggerTransition() {
         return this.request('TriggerStudioModeTransition');
     }
+
+    // ================================================================
+    // SCENE COLLECTION
+    // ================================================================
+
+    async getSceneCollectionList() {
+        return this.request('GetSceneCollectionList');
+    }
+
+    async setSceneCollection(name) {
+        return this.request('SetCurrentSceneCollection', { sceneCollectionName: name });
+    }
+
+    // ================================================================
+    // SCENE ITEMS ADVANCED
+    // ================================================================
+
+    async getSceneItemTransform(sceneName, sceneItemId) {
+        return this.request('GetSceneItemTransform', { sceneName, sceneItemId });
+    }
+
+    async setSceneItemTransform(sceneName, sceneItemId, transform) {
+        return this.request('SetSceneItemTransform', {
+            sceneName,
+            sceneItemId,
+            sceneItemTransform: transform,
+        });
+    }
+
+    async duplicateSceneItem(sceneName, sceneItemId, destScene) {
+        const data = { sceneName, sceneItemId };
+        if (destScene) data.destinationSceneName = destScene;
+        return this.request('DuplicateSceneItem', data);
+    }
+
+    async removeSceneItem(sceneName, sceneItemId) {
+        return this.request('RemoveSceneItem', { sceneName, sceneItemId });
+    }
+
+    async createSceneItem(sceneName, sourceName) {
+        return this.request('CreateSceneItem', { sceneName, sourceName });
+    }
+
+    async getSceneItemIndex(sceneName, sceneItemId) {
+        return this.request('GetSceneItemIndex', { sceneName, sceneItemId });
+    }
+
+    // ================================================================
+    // SOURCES / INPUTS ADVANCED
+    // ================================================================
+
+    async getInputSettings(inputName) {
+        return this.request('GetInputSettings', { inputName });
+    }
+
+    async setInputSettings(inputName, settings) {
+        return this.request('SetInputSettings', { inputName, inputSettings: settings });
+    }
+
+    async getInputDefaultSettings(inputKind) {
+        return this.request('GetInputDefaultSettings', { inputKind });
+    }
+
+    async createInput(sceneName, inputName, inputKind, settings) {
+        const data = { sceneName, inputName, inputKind };
+        if (settings) data.inputSettings = settings;
+        return this.request('CreateInput', data);
+    }
+
+    async removeInput(inputName) {
+        return this.request('RemoveInput', { inputName });
+    }
+
+    async getInputAudioBalance(inputName) {
+        return this.request('GetInputAudioBalance', { inputName });
+    }
+
+    async setInputAudioBalance(inputName, balance) {
+        return this.request('SetInputAudioBalance', { inputName, inputAudioBalance: balance });
+    }
+
+    // ================================================================
+    // FILTERS / EFFECTS
+    // ================================================================
+
+    async getSourceFilters(sourceName) {
+        return this.request('GetSourceFilterList', { sourceName });
+    }
+
+    async addSourceFilter(sourceName, filterName, filterKind, settings) {
+        const data = { sourceName, filterName, filterKind };
+        if (settings) data.filterSettings = settings;
+        return this.request('CreateSourceFilter', data);
+    }
+
+    async removeSourceFilter(sourceName, filterName) {
+        return this.request('RemoveSourceFilter', { sourceName, filterName });
+    }
+
+    async setSourceFilterEnabled(sourceName, filterName, enabled) {
+        return this.request('SetSourceFilterEnabled', {
+            sourceName,
+            filterName,
+            filterEnabled: enabled,
+        });
+    }
+
+    async setSourceFilterSettings(sourceName, filterName, settings) {
+        return this.request('SetSourceFilterSettings', {
+            sourceName,
+            filterName,
+            filterSettings: settings,
+        });
+    }
+
+    async getSourceFilterSettings(sourceName, filterName) {
+        return this.request('GetSourceFilter', { sourceName, filterName });
+    }
+
+    // ================================================================
+    // VIRTUAL CAMERA
+    // ================================================================
+
+    async startVirtualCam() { return this.request('StartVirtualCam'); }
+    async stopVirtualCam()  { return this.request('StopVirtualCam'); }
+    async getVirtualCamStatus() { return this.request('GetVirtualCamStatus'); }
+
+    // ================================================================
+    // REPLAY BUFFER
+    // ================================================================
+
+    async startReplayBuffer() { return this.request('StartReplayBuffer'); }
+    async stopReplayBuffer()  { return this.request('StopReplayBuffer'); }
+    async saveReplayBuffer()  { return this.request('SaveReplayBuffer'); }
+    async getReplayBufferStatus() { return this.request('GetReplayBufferStatus'); }
+
+    // ================================================================
+    // OUTPUT
+    // ================================================================
+
+    async getOutputList() { return this.request('GetOutputList'); }
+
+    async getOutputSettings(outputName) {
+        return this.request('GetOutputSettings', { outputName });
+    }
+
+    async startOutput(outputName) {
+        return this.request('StartOutput', { outputName });
+    }
+
+    async stopOutput(outputName) {
+        return this.request('StopOutput', { outputName });
+    }
+
+    async getOutputStatus(outputName) {
+        return this.request('GetOutputStatus', { outputName });
+    }
+
+    // ================================================================
+    // HOTKEYS
+    // ================================================================
+
+    async getHotkeyList() { return this.request('GetHotkeyList'); }
+
+    async triggerHotkey(hotkeyName) {
+        return this.request('TriggerHotkeyByName', { hotkeyName });
+    }
+
+    async triggerHotkeySequence(keyId, modifiers) {
+        const data = { keyId };
+        if (modifiers) data.keyModifiers = modifiers;
+        return this.request('TriggerHotkeyByKeySequence', data);
+    }
+
+    // ================================================================
+    // PROFILES
+    // ================================================================
+
+    async getProfileList() { return this.request('GetProfileList'); }
+
+    async setProfile(name) {
+        return this.request('SetCurrentProfile', { profileName: name });
+    }
+
+    // ================================================================
+    // STUDIO MODE
+    // ================================================================
+
+    async getStudioModeEnabled() {
+        return this.request('GetStudioModeEnabled');
+    }
+
+    async setStudioModeEnabled(enabled) {
+        return this.request('SetStudioModeEnabled', { studioModeEnabled: enabled });
+    }
+
+    // ================================================================
+    // MEDIA INPUT
+    // ================================================================
+
+    async getMediaInputStatus(inputName) {
+        return this.request('GetMediaInputStatus', { inputName });
+    }
+
+    async setMediaInputCursor(inputName, cursor) {
+        return this.request('SetMediaInputCursor', { inputName, mediaCursor: cursor });
+    }
+
+    async offsetMediaInputCursor(inputName, offset) {
+        return this.request('OffsetMediaInputCursor', { inputName, mediaCursorOffset: offset });
+    }
+
+    async triggerMediaInputAction(inputName, action) {
+        return this.request('TriggerMediaInputAction', { inputName, mediaAction: action });
+    }
+
+    // ================================================================
+    // SCREENSHOTS
+    // ================================================================
+
+    async getSourceScreenshot(sourceName, format, width, height) {
+        const data = { sourceName, imageFormat: format };
+        if (width) data.imageWidth = width;
+        if (height) data.imageHeight = height;
+        return this.request('GetSourceScreenshot', data);
+    }
+
+    async saveSourceScreenshot(sourceName, format, filePath) {
+        return this.request('SaveSourceScreenshot', {
+            sourceName,
+            imageFormat: format,
+            imageFilePath: filePath,
+        });
+    }
 }
 
 // Global singleton

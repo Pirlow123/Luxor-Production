@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" fill="none">
+  <!-- Blackmagic Design inspired logo for ATEM -->
+  <rect width="200" height="200" rx="20" fill="#1a1a1a"/>
+  <!-- Stylized "B" mark -->
+  <path d="M60 40h40c22 0 38 12 38 30 0 12-8 22-20 26v1c16 4 24 16 24 30 0 20-18 33-42 33H60V40z" fill="#e5e5e5"/>
+  <path d="M82 60v24h16c12 0 18-5 18-12s-6-12-18-12H82z" fill="#1a1a1a"/>
+  <path d="M82 100v24h18c13 0 20-5 20-12s-7-12-20-12H82z" fill="#1a1a1a"/>
+  <!-- ATEM text -->
+  <text x="100" y="178" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="18" font-weight="700" fill="#e5e5e5" letter-spacing="4">ATEM</text>
+</svg>

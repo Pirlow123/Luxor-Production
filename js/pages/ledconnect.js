@@ -840,7 +840,8 @@ const LedConnectPage = {
         const r = this._result;
         if (!r) return;
 
-        const fileName = prompt('Save report as:', `LED-Connection-${r.cols}x${r.rows}-${r.panel.brand}`);
+        const defaultName = `LED-Connection-${r.cols}x${r.rows}-${r.panel.brand}`;
+        const fileName = window.luxorProject ? defaultName : prompt('Save report as:', defaultName);
         if (!fileName) return;
 
         const c = this._config;
@@ -1016,13 +1017,7 @@ ${c.useBackup ? '<h2>Backup Configuration</h2><p style="font-size:12px;color:#1a
 </div>
 </body></html>`;
 
-        const blob = new Blob([html], { type: 'text/html' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = fileName + '.html';
-        a.click();
-        URL.revokeObjectURL(url);
+        UI.exportFile(fileName + '.html', html, [{ name: 'HTML Report', extensions: ['html'] }]);
     },
 
     // ================================================================

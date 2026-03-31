@@ -50,6 +50,23 @@ function createWindow() {
         return { action: 'deny' };
     });
 
+    // Handle file downloads (blob exports from LED Auto-Connect, Diagram Builder, etc.)
+    mainWindow.webContents.session.on('will-download', (event, item) => {
+        const fileName = item.getFilename();
+        const result = dialog.showSaveDialogSync(mainWindow, {
+            title: 'Save Export',
+            defaultPath: fileName,
+            filters: [
+                { name: 'All Files', extensions: ['*'] },
+            ],
+        });
+        if (result) {
+            item.setSavePath(result);
+        } else {
+            item.cancel();
+        }
+    });
+
     // Build menu
     const menu = Menu.buildFromTemplate([
         {
@@ -83,8 +100,8 @@ function createWindow() {
                     dialog.showMessageBox(mainWindow, {
                         type: 'info',
                         title: 'Luxor Production',
-                        message: 'Luxor Production v1.2',
-                        detail: 'Universal production control platform.\nSupports Hippotizer, Resolume Arena, vMix, CasparCG, OBS Studio, Barco E2/S3, QLab, Disguise, and Pixera.\nIncludes LED Processor control (Novastar, Megapixel Helios, Brompton Tessera), PTZ camera control (Panasonic, BirdDog), network switch monitoring (Luminex GigaCore), lighting console integration (grandMA3, Avolites Titan), Riedel Bolero intercom, and PIXL Grid test patterns.\n\nBuilt with Electron.',
+                        message: 'Luxor Production v1.3',
+                        detail: 'Universal production control platform for live events, broadcast, and AV installations.\n\nMedia Servers: Hippotizer, Resolume Arena, vMix, CasparCG, OBS Studio, Barco E2/S3, QLab, Disguise, Pixera, Blackmagic ATEM\n\nLED Tools: LED Calculator, LED Setup Calc, PIXL Grid, Diagram Builder, LED Auto-Connect, 3D Stage Visualizer, 3D LED Layout\n\nProduction: Power Distribution, Fixture Patch, Truck Packer, Capture Viewer, Equipment Specifications\n\nNetwork & Control: LED Processors (Novastar, Helios, Brompton), PTZ Cameras, Network Switches, Lighting Consoles, Intercom Systems\n\nBuilt with Electron.',
                     });
                 }},
             ]
@@ -183,6 +200,23 @@ ipcMain.handle('dialog-open', async () => {
         }
     }
     return null;
+});
+
+ipcMain.handle('export-file', async (event, { defaultName, content, filters }) => {
+    const result = await dialog.showSaveDialog(mainWindow, {
+        title: 'Export',
+        defaultPath: defaultName,
+        filters: filters || [{ name: 'All Files', extensions: ['*'] }],
+    });
+    if (!result.canceled && result.filePath) {
+        try {
+            fs.writeFileSync(result.filePath, content, 'utf8');
+            return { ok: true, path: result.filePath };
+        } catch (e) {
+            return { ok: false, error: e.message };
+        }
+    }
+    return { ok: false, canceled: true };
 });
 
 // Handle app lifecycle

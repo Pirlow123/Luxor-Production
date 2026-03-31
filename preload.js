@@ -9,4 +9,5 @@ contextBridge.exposeInMainWorld('luxorProject', {
     onLoadData: (callback) => ipcRenderer.on('load-project-data', (_, data) => callback(data)),
     onMenuNew: (callback) => ipcRenderer.on('menu-new-project', () => callback()),
     onMenuSave: (callback) => ipcRenderer.on('menu-save-project', () => callback()),
+    exportFile: (defaultName, content, filters) => ipcRenderer.invoke('export-file', { defaultName, content, filters }),
 });

@@ -78,10 +78,6 @@ const ShowRunPage = {
                         <span class="sr-go-sub" id="sr-go-label">Next Cue</span>
                     </button>
 
-                    <button class="sr-btn sr-btn-estop" onclick="HippoApp.emergencyStop()" title="Emergency Stop — Stops Everything">
-                        <i class="fas fa-circle-xmark"></i>
-                        <span>E-STOP</span>
-                    </button>
                 </div>
 
                 <div class="sr-transport-group sr-transport-end">
@@ -187,10 +183,6 @@ const ShowRunPage = {
                         <span class="sr-res-master-val">${Math.round((comp?.master?.value ?? 1) * 100)}%</span>
                     </div>
 
-                    <button class="sr-btn sr-btn-estop" onclick="ShowRunPage.resolumeClearAll()" title="Clear All Layers">
-                        <i class="fas fa-circle-xmark"></i>
-                        <span>CLEAR ALL</span>
-                    </button>
                 </div>
 
                 <div class="sr-transport-group sr-transport-end">
@@ -723,7 +715,7 @@ const ShowRunPage = {
                 <span class="sr-clock" id="show-clock">${new Date().toLocaleTimeString()}</span>
             </div>
             <div class="sr-transport-group">
-                <button class="sr-btn sr-btn-estop" onclick="ShowRunPage.casparcgClearAll()"><i class="fas fa-ban"></i> CLEAR ALL</button>
+                <button class="sr-btn sr-btn-stop" onclick="ShowRunPage.casparcgClearAll()"><i class="fas fa-ban"></i> CLEAR ALL</button>
             </div>
         </div>
         ${channels.map((ch, ci) => `
@@ -1021,9 +1013,6 @@ const ShowRunPage = {
                 <button class="sr-btn sr-btn-stop" onclick="ShowRunPage.qlabStop()" style="min-width:80px;"><i class="fas fa-stop"></i> STOP</button>
                 <button class="sr-btn" onclick="ShowRunPage.qlabPause()" style="min-width:80px;"><i class="fas fa-pause"></i> PAUSE</button>
                 <button class="sr-btn" onclick="ShowRunPage.qlabResume()" style="min-width:80px;"><i class="fas fa-play"></i> RESUME</button>
-                <button class="sr-btn sr-btn-estop" onclick="ShowRunPage.qlabPanic()" title="PANIC — Stop Everything" style="min-width:80px;animation:sr-panic-flash 0.5s infinite;">
-                    <i class="fas fa-exclamation-triangle"></i> PANIC
-                </button>
             </div>
             <div class="sr-transport-group sr-transport-end">
                 <div class="sr-status-pill" id="sr-engine-pill">

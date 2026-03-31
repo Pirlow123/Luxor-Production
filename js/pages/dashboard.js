@@ -11,7 +11,7 @@ const DashboardPage = {
                 <div class="empty-state" style="padding:80px 20px">
                     <i class="fas fa-plug" style="font-size:48px;opacity:0.15;margin-bottom:16px"></i>
                     <h3>No Server Connected</h3>
-                    <p>Add a server (Hippotizer, Resolume, vMix, CasparCG, OBS, Barco E2, QLab, Disguise, Pixera) to begin.</p>
+                    <p>Add a server (Hippotizer, Resolume, vMix, CasparCG, OBS, Barco E2, QLab, Disguise, Pixera, Blackmagic ATEM) to begin.</p>
                     <button class="btn btn-primary mt-md" onclick="HippoApp.showAddServer()">
                         <i class="fas fa-plus"></i> Add Server
                     </button>
@@ -253,6 +253,9 @@ const DashboardPage = {
         // Pixera dashboard
         if (serverType === 'pixera') return this._renderPixeraDash();
 
+        // Blackmagic ATEM dashboard
+        if (serverType === 'atem') return this._renderAtemDash();
+
         if (isResolume) {
             const comp = appState.get('composition');
             const layerCount = comp?.layers?.length || 0;
@@ -337,8 +340,6 @@ const DashboardPage = {
                     <button class="btn btn-primary" onclick="HippoApp.playAll()" title="Play All Timelines"><i class="fas fa-play"></i> PLAY ALL</button>
                     <button class="btn btn-secondary" onclick="HippoApp.stopAll()" title="Stop All Timelines"><i class="fas fa-stop"></i> STOP ALL</button>
                     <button class="btn btn-secondary" onclick="HippoApp.resetAll()" title="Reset All Timelines"><i class="fas fa-backward-step"></i> RESET ALL</button>
-                    <div style="width:1px;height:28px;background:var(--border);margin:0 4px;"></div>
-                    <button class="btn btn-secondary" style="color:var(--danger)" onclick="HippoApp.emergencyStop()" title="Emergency Stop — Stop and Mute Everything"><i class="fas fa-exclamation-triangle"></i> E-STOP</button>
                 </div>
             </div>
 
@@ -648,6 +649,18 @@ const DashboardPage = {
                         `).join('') : '<span class="text-muted">No sections</span>'}
                     </div>
                 </div>
+            </div>
+            <div class="card mt-md">
+                <div class="card-header">
+                    <h3><i class="fas fa-cube"></i> 3D Stage Preview &mdash; Disguise</h3>
+                    <div style="display:flex;gap:6px;">
+                        <button class="btn btn-xs btn-ghost" onclick="DashboardPage._initDisguise3D()"><i class="fas fa-sync-alt"></i> Refresh Preview</button>
+                        <button class="btn btn-xs btn-primary" onclick="HippoApp.navigate('stage3d')"><i class="fas fa-expand"></i> Open in 3D Visualizer</button>
+                    </div>
+                </div>
+                <div class="card-body" style="padding:0;position:relative;">
+                    <div id="disguise-3d-preview" style="width:100%;height:300px;background:#0a0a0c;border-radius:0 0 8px 8px;overflow:hidden;"></div>
+                </div>
             </div>`;
     },
 
@@ -708,7 +721,493 @@ const DashboardPage = {
                         </table>
                     </div>
                 </div>
+            </div>
+            <div class="card mt-md">
+                <div class="card-header">
+                    <h3><i class="fas fa-cube"></i> 3D Stage Preview &mdash; Pixera</h3>
+                    <div style="display:flex;gap:6px;">
+                        <button class="btn btn-xs btn-ghost" onclick="DashboardPage._initPixera3D()"><i class="fas fa-sync-alt"></i> Refresh Preview</button>
+                        <button class="btn btn-xs btn-primary" onclick="HippoApp.navigate('stage3d')"><i class="fas fa-expand"></i> Open in 3D Visualizer</button>
+                    </div>
+                </div>
+                <div class="card-body" style="padding:0;position:relative;">
+                    <div id="pixera-3d-preview" style="width:100%;height:300px;background:#0a0a0c;border-radius:0 0 8px 8px;overflow:hidden;"></div>
+                </div>
             </div>`;
+    },
+
+    _renderAtemDash() {
+        const info = appState.get('serverInfo') || {};
+        const atemState = appState.get('atemState') || {};
+        const inputs = appState.get('atemInputs') || [];
+        const model = info.model || atemState.model || 'Blackmagic ATEM';
+        const firmware = info.firmware || atemState.firmware || '--';
+        const pgmId = atemState.program ?? info.program ?? 1;
+        const pvwId = atemState.preview ?? info.preview ?? 2;
+        const pgmInput = inputs.find(i => i.id === pgmId);
+        const pvwInput = inputs.find(i => i.id === pvwId);
+        const ftb = atemState.ftb || false;
+        const streaming = atemState.streaming || false;
+        const recording = atemState.recording || false;
+        const dsk = atemState.dsk || [];
+
+        return `
+            <div class="dashboard-stats">
+                ${UI.statCard('fa-random', 'accent', 'Switcher', this._statusBadge('Running'), model)}
+                ${UI.statCard('fa-tv', 'green', 'Program', pgmInput?.shortName || pgmInput?.name || `Input ${pgmId}`, 'On-Air')}
+                ${UI.statCard('fa-eye', 'purple', 'Preview', pvwInput?.shortName || pvwInput?.name || `Input ${pvwId}`, 'Preview')}
+                ${UI.statCard('fa-th-list', 'blue', 'Inputs', inputs.length, `FW: ${UI.esc(firmware)}`)}
+            </div>
+            <div class="dashboard-panels">
+                <div class="card">
+                    <div class="card-header">
+                        <h3><i class="fas fa-bolt"></i> Quick Actions</h3>
+                        <button class="btn btn-xs btn-ghost" onclick="HippoApp.navigate('showrun')"><i class="fas fa-theater-masks"></i> Open Show Run</button>
+                    </div>
+                    <div class="card-body" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+                        <button class="btn btn-danger" onclick="HippoApp.atemDashAction('cut')" title="Cut"><i class="fas fa-cut"></i> CUT</button>
+                        <button class="btn btn-primary" onclick="HippoApp.atemDashAction('auto')" title="Auto Transition"><i class="fas fa-wave-square"></i> AUTO</button>
+                        <button class="btn ${ftb ? 'btn-danger' : 'btn-secondary'}" onclick="HippoApp.atemDashAction('ftb')" title="Fade to Black">
+                            <i class="fas fa-moon"></i> FTB ${ftb ? '(ON)' : ''}
+                        </button>
+                        <div style="width:1px;height:28px;background:var(--border);margin:0 4px;"></div>
+                        <button class="btn ${recording ? 'btn-danger' : 'btn-secondary'}" onclick="HippoApp.atemDashAction('record')" title="Toggle Recording">
+                            <i class="fas fa-circle"></i> ${recording ? 'STOP REC' : 'REC'}
+                        </button>
+                        <button class="btn ${streaming ? 'btn-danger' : 'btn-secondary'}" onclick="HippoApp.atemDashAction('stream')" title="Toggle Stream">
+                            <i class="fas fa-broadcast-tower"></i> ${streaming ? 'STOP STREAM' : 'STREAM'}
+                        </button>
+                        <div style="width:1px;height:28px;background:var(--border);margin:0 4px;"></div>
+                        ${dsk.map((d, i) => `
+                            <button class="btn ${d.onAir ? 'btn-warning' : 'btn-secondary'}" onclick="HippoApp.atemDashAction('dskAuto',${i})" title="DSK ${i + 1}">
+                                <i class="fas fa-key"></i> DSK${i + 1} ${d.onAir ? '(ON)' : ''}
+                            </button>
+                        `).join('')}
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-header"><h3><i class="fas fa-th-list"></i> Input Sources <span class="text-muted" style="font-size:10px;font-weight:400;">Click to switch</span></h3></div>
+                    <div class="card-body">
+                        ${inputs.filter(inp => inp.type !== 'Program' && inp.type !== 'AuxOutput').map(inp => {
+                            const isPgm = inp.id === pgmId;
+                            const isPvw = inp.id === pvwId;
+                            return `<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;margin-bottom:4px;border-radius:6px;border:1px solid ${isPgm ? 'rgba(74,222,128,0.3)' : isPvw ? 'rgba(250,204,21,0.2)' : 'var(--border)'};background:${isPgm ? 'rgba(74,222,128,0.06)' : isPvw ? 'rgba(250,204,21,0.04)' : 'var(--bg-secondary)'};cursor:pointer;transition:all 0.12s;" onclick="HippoApp.atemDashAction('pgm',${inp.id})" title="Send to Program">
+                                <span class="mono" style="font-size:10px;color:var(--text-muted);min-width:36px;">${UI.esc(inp.shortName || inp.id)}</span>
+                                <span style="font-size:12px;font-weight:${isPgm ? '800' : '500'};color:${isPgm ? '#4ade80' : isPvw ? '#facc15' : 'var(--text-primary)'};">${UI.esc(inp.name)}</span>
+                                <span class="text-muted" style="font-size:10px;margin-left:auto;">${UI.esc(inp.type)}</span>
+                                ${isPgm ? '<span style="font-size:9px;font-weight:700;color:#4ade80;background:rgba(34,197,94,0.15);padding:2px 6px;border-radius:4px;">PGM</span>' : ''}
+                                ${isPvw ? '<span style="font-size:9px;font-weight:700;color:#facc15;background:rgba(250,204,21,0.15);padding:2px 6px;border-radius:4px;">PVW</span>' : ''}
+                                ${!isPgm && !isPvw ? `<button class="tl-transport play" onclick="event.stopPropagation();HippoApp.atemDashAction('pvw',${inp.id})" title="Set as Preview"><i class="fas fa-eye"></i></button>` : ''}
+                            </div>`;
+                        }).join('')}
+                    </div>
+                </div>
+            </div>
+            <div class="card mt-md">
+                <div class="card-header"><h3><i class="fas fa-info-circle"></i> Switcher Info</h3></div>
+                <div class="card-body">
+                    <table>
+                        <tr><td class="text-muted">Model</td><td>${UI.esc(model)}</td></tr>
+                        <tr><td class="text-muted">Firmware</td><td class="mono">${UI.esc(firmware)}</td></tr>
+                        <tr><td class="text-muted">Inputs</td><td>${inputs.length}</td></tr>
+                        <tr><td class="text-muted">Streaming</td><td>${streaming ? UI.badge('Live', 'red') : UI.badge('Offline', 'orange')}</td></tr>
+                        <tr><td class="text-muted">Recording</td><td>${recording ? UI.badge('Recording', 'red') : UI.badge('Stopped', 'orange')}</td></tr>
+                        <tr><td class="text-muted">FTB</td><td>${ftb ? UI.badge('Active', 'red') : UI.badge('Off', 'green')}</td></tr>
+                    </table>
+                </div>
+            </div>`;
+    },
+
+    /* ── 3D Stage Preview (shared state) ── */
+    _dash3D: null, // { renderer, scene, camera, animId, orbitState, resizeHandler }
+
+    _cleanup3D() {
+        if (!this._dash3D) return;
+        const s = this._dash3D;
+        if (s.animId) cancelAnimationFrame(s.animId);
+        if (s.resizeHandler) window.removeEventListener('resize', s.resizeHandler);
+        if (s.renderer) { s.renderer.dispose(); s.renderer.domElement.remove(); }
+        this._dash3D = null;
+    },
+
+    /**
+     * Shared helper: build a mini 3D scene inside `containerId`.
+     * Returns the state object stored in _dash3D.
+     */
+    _build3DPreview(containerId) {
+        this._cleanup3D();
+        const container = document.getElementById(containerId);
+        if (!container || typeof THREE === 'undefined') return null;
+
+        // Clear previous content
+        container.innerHTML = '';
+
+        const w = container.clientWidth || 400;
+        const h = container.clientHeight || 300;
+
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x0a0a0c);
+        scene.fog = new THREE.Fog(0x0a0a0c, 40, 100);
+
+        const camera = new THREE.PerspectiveCamera(50, w / h, 0.1, 200);
+        camera.position.set(10, 7, 14);
+        camera.lookAt(0, 2, 0);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(w, h);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        container.appendChild(renderer.domElement);
+
+        // Lights
+        const ambient = new THREE.AmbientLight(0x404060, 0.6);
+        scene.add(ambient);
+        const dir = new THREE.DirectionalLight(0xffffff, 0.8);
+        dir.position.set(8, 12, 10);
+        dir.castShadow = true;
+        scene.add(dir);
+        scene.add(new THREE.HemisphereLight(0x8090b0, 0x303030, 0.4));
+
+        // Grid helper
+        const grid = new THREE.GridHelper(30, 30, 0x333344, 0x1a1a2e);
+        scene.add(grid);
+
+        // Stage floor (grey plane)
+        const floorGeo = new THREE.PlaneGeometry(20, 14);
+        const floorMat = new THREE.MeshStandardMaterial({ color: 0x2a2a30, roughness: 0.85 });
+        const floor = new THREE.Mesh(floorGeo, floorMat);
+        floor.rotation.x = -Math.PI / 2;
+        floor.receiveShadow = true;
+        scene.add(floor);
+
+        // Orbit controls (same pattern as stage3d.js)
+        let isOrbiting = false, isPanning = false, prevX = 0, prevY = 0;
+        const spherical = {
+            theta: Math.atan2(camera.position.x, camera.position.z),
+            phi: Math.acos(camera.position.y / camera.position.length()),
+            radius: camera.position.length()
+        };
+        const target = new THREE.Vector3(0, 2, 0);
+
+        const updateCamera = () => {
+            const x = spherical.radius * Math.sin(spherical.phi) * Math.sin(spherical.theta);
+            const y = spherical.radius * Math.cos(spherical.phi);
+            const z = spherical.radius * Math.sin(spherical.phi) * Math.cos(spherical.theta);
+            camera.position.set(target.x + x, target.y + y, target.z + z);
+            camera.lookAt(target);
+        };
+
+        const el = renderer.domElement;
+        el.addEventListener('mousedown', (e) => {
+            if (e.button === 0) isOrbiting = true;
+            else if (e.button === 2) isPanning = true;
+            prevX = e.clientX; prevY = e.clientY;
+        });
+        el.addEventListener('mousemove', (e) => {
+            const dx = e.clientX - prevX, dy = e.clientY - prevY;
+            prevX = e.clientX; prevY = e.clientY;
+            if (isOrbiting) {
+                spherical.theta -= dx * 0.005;
+                spherical.phi = Math.max(0.1, Math.min(Math.PI - 0.1, spherical.phi + dy * 0.005));
+                updateCamera();
+            }
+            if (isPanning) {
+                const ps = 0.02 * spherical.radius;
+                const right = new THREE.Vector3();
+                right.crossVectors(camera.getWorldDirection(new THREE.Vector3()), new THREE.Vector3(0, 1, 0)).normalize();
+                target.add(right.multiplyScalar(-dx * ps * 0.1));
+                target.y += dy * ps * 0.1;
+                updateCamera();
+            }
+        });
+        const onUp = () => { isOrbiting = false; isPanning = false; };
+        el.addEventListener('mouseup', onUp);
+        el.addEventListener('mouseleave', onUp);
+        el.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            spherical.radius = Math.max(2, Math.min(60, spherical.radius + e.deltaY * 0.02));
+            updateCamera();
+        }, { passive: false });
+        el.addEventListener('contextmenu', (e) => e.preventDefault());
+
+        // Resize handler
+        const resizeHandler = () => {
+            const nw = container.clientWidth || 400;
+            const nh = container.clientHeight || 300;
+            camera.aspect = nw / nh;
+            camera.updateProjectionMatrix();
+            renderer.setSize(nw, nh);
+        };
+        window.addEventListener('resize', resizeHandler);
+
+        // Animation loop
+        let animId;
+        const animate = () => {
+            animId = requestAnimationFrame(animate);
+            renderer.render(scene, camera);
+        };
+        animate();
+
+        const state = { renderer, scene, camera, get animId() { return animId; }, orbitState: { spherical, target, updateCamera }, resizeHandler };
+        // Store animId setter so cleanup works
+        Object.defineProperty(state, 'animId', {
+            get() { return animId; },
+            set(v) { animId = v; },
+            configurable: true
+        });
+        this._dash3D = state;
+        return state;
+    },
+
+    /**
+     * Add an LED wall / screen rectangle to the scene.
+     */
+    _add3DScreen(scene, { x, y, z, w, h, rotY, color, label }) {
+        x = x || 0; y = y || 0; z = z || 0;
+        w = w || 4; h = h || 2.5;
+        rotY = rotY || 0;
+        color = color || 0x1a6bff;
+
+        const geo = new THREE.PlaneGeometry(w, h);
+        const mat = new THREE.MeshStandardMaterial({
+            color, emissive: color, emissiveIntensity: 0.25,
+            side: THREE.DoubleSide, roughness: 0.3, metalness: 0.6
+        });
+        const mesh = new THREE.Mesh(geo, mat);
+        mesh.position.set(x, y + h / 2, z);
+        mesh.rotation.y = rotY;
+        mesh.castShadow = true;
+        scene.add(mesh);
+
+        // Border wireframe
+        const edges = new THREE.EdgesGeometry(geo);
+        const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: 0x4488ff, linewidth: 1 }));
+        line.position.copy(mesh.position);
+        line.rotation.copy(mesh.rotation);
+        scene.add(line);
+    },
+
+    /**
+     * Add a camera frustum wireframe to the scene.
+     */
+    _add3DCameraFrustum(scene, { x, y, z, lookX, lookY, lookZ, color }) {
+        x = x ?? 0; y = y ?? 5; z = z ?? 10;
+        lookX = lookX ?? 0; lookY = lookY ?? 2; lookZ = lookZ ?? 0;
+        color = color || 0x00ff88;
+
+        // Camera body indicator
+        const bodyGeo = new THREE.BoxGeometry(0.4, 0.3, 0.5);
+        const bodyMat = new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 0.4 });
+        const body = new THREE.Mesh(bodyGeo, bodyMat);
+        body.position.set(x, y, z);
+        scene.add(body);
+
+        // Frustum cone from camera to target
+        const from = new THREE.Vector3(x, y, z);
+        const to = new THREE.Vector3(lookX, lookY, lookZ);
+        const dir = new THREE.Vector3().subVectors(to, from);
+        const len = Math.min(dir.length(), 8);
+        dir.normalize();
+
+        const fovHalf = 0.35; // ~20 deg
+        const endW = len * Math.tan(fovHalf);
+        const endH = endW * 0.5625; // 16:9 aspect
+
+        const right = new THREE.Vector3();
+        right.crossVectors(dir, new THREE.Vector3(0, 1, 0)).normalize();
+        const up = new THREE.Vector3();
+        up.crossVectors(right, dir).normalize();
+
+        const endCenter = from.clone().add(dir.clone().multiplyScalar(len));
+        const corners = [
+            endCenter.clone().add(right.clone().multiplyScalar(endW)).add(up.clone().multiplyScalar(endH)),
+            endCenter.clone().add(right.clone().multiplyScalar(-endW)).add(up.clone().multiplyScalar(endH)),
+            endCenter.clone().add(right.clone().multiplyScalar(-endW)).add(up.clone().multiplyScalar(-endH)),
+            endCenter.clone().add(right.clone().multiplyScalar(endW)).add(up.clone().multiplyScalar(-endH)),
+        ];
+
+        const pts = [];
+        for (let i = 0; i < 4; i++) {
+            pts.push(from, corners[i]);
+            pts.push(corners[i], corners[(i + 1) % 4]);
+        }
+        const lineGeo = new THREE.BufferGeometry().setFromPoints(pts);
+        const lineMat = new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.5 });
+        scene.add(new THREE.LineSegments(lineGeo, lineMat));
+    },
+
+    /* ── Disguise 3D preview ── */
+    async _initDisguise3D() {
+        const state = this._build3DPreview('disguise-3d-preview');
+        if (!state) return;
+        const { scene } = state;
+
+        const machines = appState.get('disguiseMachines') || [];
+        const transport = appState.get('disguiseTransport') || {};
+        const outputs = transport.outputs || [];
+
+        // Try to fetch real spatial data from the deep API
+        let spatialScreens = null, projectors = null, stageObjects = null;
+        try {
+            [spatialScreens, projectors, stageObjects] = await Promise.all([
+                disguiseAPI.getScreens().catch(() => null),
+                disguiseAPI.getProjectors().catch(() => null),
+                disguiseAPI.getStageObjects().catch(() => null),
+            ]);
+        } catch {}
+
+        // Use spatial screen data if available (has real 3D transforms)
+        if (spatialScreens && Array.isArray(spatialScreens) && spatialScreens.length) {
+            spatialScreens.forEach(s => {
+                const pos = s.position || {};
+                const rot = s.rotation || {};
+                const size = s.size || {};
+                this._add3DScreen(scene, {
+                    x: pos.x || 0, y: pos.y || 0, z: pos.z || 0,
+                    w: size.width || 5, h: size.height || 3,
+                    rotY: (rot.y || 0) * Math.PI / 180,
+                    color: 0x1a6bff,
+                    label: s.name || s.uid || 'Screen'
+                });
+            });
+        } else if (outputs.length) {
+            // Fallback: position LED walls in a semicircle from transport outputs
+            outputs.forEach((o, i) => {
+                const angle = (-0.4 + i * 0.8 / Math.max(outputs.length - 1, 1)) * Math.PI;
+                const r = 6;
+                this._add3DScreen(scene, {
+                    x: Math.sin(angle) * r, y: 0, z: -Math.cos(angle) * r,
+                    w: 5, h: 3, rotY: angle, color: 0x1a6bff, label: o.name
+                });
+            });
+        } else {
+            // Demo walls
+            this._add3DScreen(scene, { x: 0, y: 0, z: -6, w: 8, h: 4, rotY: 0, color: 0x1a6bff });
+            this._add3DScreen(scene, { x: -5, y: 0, z: -3, w: 5, h: 3, rotY: Math.PI * 0.3, color: 0x1a5bdd });
+            this._add3DScreen(scene, { x: 5, y: 0, z: -3, w: 5, h: 3, rotY: -Math.PI * 0.3, color: 0x1a5bdd });
+        }
+
+        // Projectors from spatial API
+        if (projectors && Array.isArray(projectors) && projectors.length) {
+            projectors.forEach(p => {
+                const pos = p.position || {};
+                this._add3DCameraFrustum(scene, {
+                    x: pos.x || 0, y: pos.y || 4, z: pos.z || 8,
+                    lookX: 0, lookY: 2, lookZ: -3,
+                    color: 0xffaa00 // orange for projectors
+                });
+            });
+        }
+
+        // Stage objects from spatial API (render as boxes)
+        if (stageObjects && Array.isArray(stageObjects) && stageObjects.length) {
+            stageObjects.forEach(obj => {
+                const pos = obj.position || {};
+                const size = obj.size || {};
+                const geo = new THREE.BoxGeometry(size.width || 1, size.height || 1, size.depth || 1);
+                const mat = new THREE.MeshStandardMaterial({ color: 0x555555, transparent: true, opacity: 0.4, wireframe: true });
+                const mesh = new THREE.Mesh(geo, mat);
+                mesh.position.set(pos.x || 0, (pos.y || 0) + (size.height || 1) / 2, pos.z || 0);
+                scene.add(mesh);
+            });
+        }
+
+        // Virtual cameras from machines
+        if (machines.length) {
+            machines.forEach((m, i) => {
+                const xOff = (i - (machines.length - 1) / 2) * 3;
+                this._add3DCameraFrustum(scene, {
+                    x: xOff, y: 4, z: 8,
+                    lookX: 0, lookY: 2, lookZ: -3,
+                    color: m.online ? 0x00ff88 : 0xff4444
+                });
+            });
+        } else if (!projectors || !projectors.length) {
+            // Demo camera only if no projectors found
+            this._add3DCameraFrustum(scene, { x: 0, y: 4, z: 10, lookX: 0, lookY: 2, lookZ: -3, color: 0x00ff88 });
+        }
+    },
+
+    /* ── Pixera 3D preview ── */
+    async _initPixera3D() {
+        const state = this._build3DPreview('pixera-3d-preview');
+        if (!state) return;
+        const { scene } = state;
+
+        const screens = appState.get('pixeraScreens') || [];
+
+        // Try to fetch deep spatial data from Pixera API
+        let screenDetails = null, devices = null;
+        try {
+            const screenHandles = await pixeraAPI.getScreens().catch(() => []);
+            if (screenHandles && screenHandles.length) {
+                screenDetails = await Promise.all(
+                    screenHandles.map(h => pixeraAPI.getScreen(h).catch(() => null))
+                ).then(arr => arr.filter(Boolean));
+            }
+            devices = await pixeraAPI.getDevices().catch(() => null);
+        } catch {}
+
+        // Use detailed screen data if available (has 3D position/rotation)
+        if (screenDetails && screenDetails.length) {
+            screenDetails.forEach((s, i) => {
+                const pos = s.position || {};
+                const rot = s.rotation || {};
+                let sw = 5, sh = 3;
+                if (s.resolution) {
+                    const rw = s.resolution.width || s.resolution.x || 1920;
+                    const rh = s.resolution.height || s.resolution.y || 1080;
+                    sh = sw * (rh / rw);
+                }
+                this._add3DScreen(scene, {
+                    x: pos.x || (i - (screenDetails.length - 1) / 2) * 6,
+                    y: pos.y || 0,
+                    z: pos.z || -5,
+                    w: sw, h: sh,
+                    rotY: (rot.y || 0) * Math.PI / 180,
+                    color: 0x8844ff,
+                    label: s.name || `Screen ${i + 1}`
+                });
+            });
+        } else if (screens.length) {
+            // Fallback: use appState screens with resolution parsing
+            screens.forEach((s, i) => {
+                const xOff = (i - (screens.length - 1) / 2) * 6;
+                let sw = 5, sh = 3;
+                if (s.resolution) {
+                    const parts = s.resolution.split(/[x×]/i);
+                    if (parts.length === 2) {
+                        const rw = parseInt(parts[0]) || 1920;
+                        const rh = parseInt(parts[1]) || 1080;
+                        sh = sw * (rh / rw);
+                    }
+                }
+                this._add3DScreen(scene, {
+                    x: xOff, y: 0, z: -5, w: sw, h: sh,
+                    rotY: 0, color: 0x8844ff, label: s.name
+                });
+            });
+        } else {
+            // Demo screens
+            this._add3DScreen(scene, { x: 0, y: 0, z: -6, w: 8, h: 4.5, rotY: 0, color: 0x8844ff });
+            this._add3DScreen(scene, { x: -6, y: 0, z: -4, w: 4, h: 2.5, rotY: Math.PI * 0.25, color: 0x6633cc });
+            this._add3DScreen(scene, { x: 6, y: 0, z: -4, w: 4, h: 2.5, rotY: -Math.PI * 0.25, color: 0x6633cc });
+        }
+
+        // Output devices as camera/projector frustums
+        if (devices && Array.isArray(devices) && devices.length) {
+            for (let i = 0; i < Math.min(devices.length, 4); i++) {
+                const xOff = (i - (Math.min(devices.length, 4) - 1) / 2) * 3;
+                this._add3DCameraFrustum(scene, {
+                    x: xOff, y: 4, z: 10,
+                    lookX: 0, lookY: 2, lookZ: -3,
+                    color: 0x00ff88
+                });
+            }
+        } else {
+            this._add3DCameraFrustum(scene, { x: 0, y: 4, z: 10, lookX: 0, lookY: 2, lookZ: -3, color: 0x00ff88 });
+        }
     },
 
     async onActivate() {
@@ -726,5 +1225,16 @@ const DashboardPage = {
                 } catch {}
             }
         }
+        // Init 3D preview for Disguise / Pixera dashboards (after DOM is ready)
+        const serverType = appState.get('serverType');
+        if (serverType === 'disguise') {
+            setTimeout(() => this._initDisguise3D(), 50);
+        } else if (serverType === 'pixera') {
+            setTimeout(() => this._initPixera3D(), 50);
+        }
+    },
+
+    onDeactivate() {
+        this._cleanup3D();
     }
 };

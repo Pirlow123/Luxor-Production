@@ -164,6 +164,126 @@ class ResolumeAPI {
     async setTempo(data) { return this.request('/composition/tempocontroller', { method: 'PUT', body: data }); }
 
     // ================================================================
+    // AUTOPILOT
+    // ================================================================
+
+    /** GET /composition/autopilot — autopilot state */
+    async getAutopilot() { return this.request('/composition/autopilot'); }
+
+    /** PUT /composition/autopilot — enable/disable autopilot */
+    async setAutopilot(enabled) { return this.request('/composition/autopilot', { method: 'PUT', body: { enabled } }); }
+
+    /** PUT /composition/autopilot — set autopilot BPM */
+    async setAutopilotBpm(bpm) { return this.request('/composition/autopilot', { method: 'PUT', body: { bpm } }); }
+
+    // ================================================================
+    // DASHBOARD / PARAMETERS
+    // ================================================================
+
+    /** GET /composition/dashboard — all dashboard parameters */
+    async getDashboard() { return this.request('/composition/dashboard'); }
+
+    /** PUT /composition/dashboard/{id} — set a dashboard parameter value */
+    async setDashboardParam(id, value) { return this.request(`/composition/dashboard/${id}`, { method: 'PUT', body: { value } }); }
+
+    // ================================================================
+    // OUTPUT
+    // ================================================================
+
+    /** GET /output — output configuration */
+    async getOutput() { return this.request('/output'); }
+
+    /** GET /output/screens — output screens */
+    async getOutputScreens() { return this.request('/output/screens'); }
+
+    /** PUT /output — enable/disable output */
+    async setOutputEnabled(enabled) { return this.request('/output', { method: 'PUT', body: { enabled } }); }
+
+    // ================================================================
+    // ADVANCED COMPOSITION (columns & decks)
+    // ================================================================
+
+    /** GET /composition/columns — all columns info */
+    async getCompositionColumns() { return this.request('/composition/columns'); }
+
+    /** GET /composition/columns/{index} — specific column */
+    async getColumn(index) { return this.request(`/composition/columns/${index}`); }
+
+    /** PUT /composition/columns/{index} — update column properties */
+    async updateColumn(index, data) { return this.request(`/composition/columns/${index}`, { method: 'PUT', body: data }); }
+
+    /** GET /composition/decks/{index} — specific deck */
+    async getDeck(index) { return this.request(`/composition/decks/${index}`); }
+
+    /** GET /composition/decks — all decks */
+    async getDecks() { return this.request('/composition/decks'); }
+
+    /** PUT /composition/decks/{index} — update deck properties */
+    async updateDeck(index, data) { return this.request(`/composition/decks/${index}`, { method: 'PUT', body: data }); }
+
+    // ================================================================
+    // CLIP ADVANCED
+    // ================================================================
+
+    /** PUT /composition/layers/{layer}/clips/{clip} — update clip properties (speed, direction, blend) */
+    async updateClip(layer, clip, data) { return this.request(`/composition/layers/${layer}/clips/${clip}`, { method: 'PUT', body: data }); }
+
+    /** PUT /composition/layers/{layer}/clips/{clip}/transport — play/pause/stop clip */
+    async setClipTransport(layer, clip, transport) { return this.request(`/composition/layers/${layer}/clips/${clip}/transport`, { method: 'PUT', body: { transport } }); }
+
+    /** GET /composition/layers/{layer}/clips/{clip}/audio — clip audio properties */
+    async getClipAudio(layer, clip) { return this.request(`/composition/layers/${layer}/clips/${clip}/audio`); }
+
+    /** PUT /composition/layers/{layer}/clips/{clip}/audio — set audio volume, pan */
+    async setClipAudio(layer, clip, data) { return this.request(`/composition/layers/${layer}/clips/${clip}/audio`, { method: 'PUT', body: data }); }
+
+    // ================================================================
+    // LAYER ADVANCED
+    // ================================================================
+
+    /** GET /composition/layers/{layer}/effects — layer effect chain */
+    async getLayerEffects(layer) { return this.request(`/composition/layers/${layer}/effects`); }
+
+    /** PUT /composition/layers/{layer}/blendmode — set blend mode */
+    async setLayerBlendMode(layer, mode) { return this.request(`/composition/layers/${layer}/blendmode`, { method: 'PUT', body: { mode } }); }
+
+    /** GET /composition/layers/{layer}/dashboard — layer dashboard params */
+    async getLayerDashboard(layer) { return this.request(`/composition/layers/${layer}/dashboard`); }
+
+    /** POST /composition/layers/{layer}/clips/{column}/connect — trigger specific clip in layer */
+    async triggerLayerColumn(layer, column) { return this.request(`/composition/layers/${layer}/clips/${column}/connect`, { method: 'POST' }); }
+
+    // ================================================================
+    // BPM / TEMPO
+    // ================================================================
+
+    /** POST /composition/tempocontroller/tap — tap tempo */
+    async tapTempo() { return this.request('/composition/tempocontroller/tap', { method: 'POST' }); }
+
+    /** POST /composition/tempocontroller/resync — resync tempo */
+    async resyncTempo() { return this.request('/composition/tempocontroller/resync', { method: 'POST' }); }
+
+    // ================================================================
+    // RECORDING
+    // ================================================================
+
+    /** POST /recording/start — start output recording */
+    async startRecording() { return this.request('/recording/start', { method: 'POST' }); }
+
+    /** POST /recording/stop — stop recording */
+    async stopRecording() { return this.request('/recording/stop', { method: 'POST' }); }
+
+    /** GET /recording — recording state */
+    async getRecordingStatus() { return this.request('/recording'); }
+
+    // ================================================================
+    // NDI
+    // ================================================================
+
+    /** GET /sources/ndi — available NDI inputs */
+    async getNDISources() { return this.request('/sources/ndi'); }
+
+    // ================================================================
     // HEALTH CHECK — use composition endpoint as health probe
     // ================================================================
     async healthCheck() {

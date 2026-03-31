@@ -175,6 +175,180 @@ class BarcoAPI {
     async powerStatus() { return this.request('powerStatus'); }
 
     // ================================================================
+    // MULTI-SCREEN / SUPERSCREEN
+    // ================================================================
+
+    /** List all super destinations */
+    async getSuperScreens() { return this.request('listSuperDestinations'); }
+
+    /** Get super destination details */
+    async getSuperScreen(id) {
+        return this.request('getSuperDestination', { id });
+    }
+
+    /** Activate a super preset (type: 'program' or 'preview') */
+    async activateSuperPreset(presetId, type = 'program') {
+        const typeCode = type === 'preview' ? 1 : 0;
+        return this.request('activateSuperPreset', { id: presetId, type: typeCode });
+    }
+
+    // ================================================================
+    // OUTPUT CONFIGURATION
+    // ================================================================
+
+    /** List all physical outputs */
+    async getOutputConfig() { return this.request('listOutputs'); }
+
+    /** Toggle an output on or off */
+    async setOutputEnabled(outputId, enabled) {
+        return this.request('toggleOutput', { id: outputId, enabled });
+    }
+
+    /** List all inputs */
+    async getInputConfig() { return this.request('listInputs'); }
+
+    /** Set input format */
+    async setInputFormat(inputId, format) {
+        return this.request('setInputFormat', { id: inputId, format });
+    }
+
+    // ================================================================
+    // TEST PATTERNS
+    // ================================================================
+
+    /** Set test pattern on a destination (grid, color bars, crosshatch, white, black, off) */
+    async setTestPattern(destId, pattern) {
+        return this.request('setTestPattern', { destId, pattern });
+    }
+
+    /** Clear test pattern from a destination */
+    async clearTestPattern(destId) {
+        return this.request('clearTestPattern', { destId });
+    }
+
+    // ================================================================
+    // BACKGROUND / FILL
+    // ================================================================
+
+    /** Set background color on a destination */
+    async setBackground(destId, r, g, b) {
+        return this.request('setBackgroundColor', { destId, r, g, b });
+    }
+
+    /** Set background image source on a destination */
+    async setBackgroundImage(destId, source) {
+        return this.request('setBackgroundSource', { destId, source });
+    }
+
+    // ================================================================
+    // LAYER ADVANCED
+    // ================================================================
+
+    /** Add a layer to a destination */
+    async addLayer(destId) {
+        return this.request('addLayer', { destId });
+    }
+
+    /** Remove a layer from a destination */
+    async removeLayer(destId, layerIndex) {
+        return this.request('removeLayer', { destId, layerIndex });
+    }
+
+    /** Set layer position and size */
+    async setLayerPosition(destId, layerIdx, x, y, w, h) {
+        return this.request('positionLayer', { destId, layerIdx, x, y, w, h });
+    }
+
+    /** Set layer source content */
+    async setLayerSource(destId, layerIdx, sourceId) {
+        return this.request('setLayerContent', { destId, layerIdx, sourceId });
+    }
+
+    /** Set layer z-order */
+    async setLayerZOrder(destId, layerIdx, zOrder) {
+        return this.request('setLayerZOrder', { destId, layerIdx, zOrder });
+    }
+
+    /** Set layer opacity/transparency */
+    async setLayerOpacity(destId, layerIdx, opacity) {
+        return this.request('setLayerTransparency', { destId, layerIdx, opacity });
+    }
+
+    // ================================================================
+    // PRESET MANAGEMENT
+    // ================================================================
+
+    /** Create a new preset */
+    async createPreset(name) {
+        return this.request('createPreset', { name });
+    }
+
+    /** Delete a preset */
+    async deletePreset(presetId) {
+        return this.request('deletePreset', { id: presetId });
+    }
+
+    /** Rename a preset */
+    async renamePreset(presetId, name) {
+        return this.request('renamePreset', { id: presetId, name });
+    }
+
+    /** Save current state to a preset */
+    async saveToPreset(presetId) {
+        return this.request('saveCurrentAsPreset', { id: presetId });
+    }
+
+    /** Get preset configuration details */
+    async listPresetDetails(presetId) {
+        return this.request('getPresetDetails', { id: presetId });
+    }
+
+    // ================================================================
+    // MULTIVIEWER
+    // ================================================================
+
+    /** Get multiviewer layout */
+    async getMultiviewerLayout() { return this.request('getMVLayout'); }
+
+    /** Set multiviewer window source */
+    async setMultiviewerSource(windowId, sourceId) {
+        return this.request('setMVWindowSource', { windowId, sourceId });
+    }
+
+    // ================================================================
+    // SYSTEM
+    // ================================================================
+
+    /** Get system status (temperature, uptime, etc.) */
+    async getSystemStatus() { return this.request('getSystemStatus'); }
+
+    /** Get network configuration */
+    async getNetworkConfig() { return this.request('getNetworkSettings'); }
+
+    /** Reboot the device */
+    async reboot() { return this.request('reboot'); }
+
+    /** Get firmware version info */
+    async getFirmwareVersion() { return this.request('getFirmwareInfo'); }
+
+    // ================================================================
+    // STILL STORE
+    // ================================================================
+
+    /** List all still images */
+    async listStills() { return this.request('listStillImages'); }
+
+    /** Capture a still image from a destination */
+    async captureStill(destId, name) {
+        return this.request('captureStillImage', { destId, name });
+    }
+
+    /** Load a still image onto a destination layer */
+    async loadStill(destId, layerIdx, stillId) {
+        return this.request('loadStillImage', { destId, layerIdx, stillId });
+    }
+
+    // ================================================================
     // HEALTH CHECK
     // ================================================================
     async healthCheck() {

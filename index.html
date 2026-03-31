@@ -11,6 +11,7 @@
     <link rel="stylesheet" href="css/showrun.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 </head>
 <body>
     <div id="app">
@@ -133,6 +134,31 @@
                     <i class="fas fa-plug"></i><span>LED Auto-Connect</span>
                 </a>
 
+                <div class="nav-section-label">3D TOOLS</div>
+                <a href="#stage3d" class="nav-item" data-page="stage3d">
+                    <i class="fas fa-cube"></i><span>3D Stage Visualizer</span>
+                </a>
+                <a href="#ledpanel3d" class="nav-item" data-page="ledpanel3d">
+                    <i class="fas fa-vector-square"></i><span>3D LED Layout</span>
+                </a>
+
+                <div class="nav-section-label">PRODUCTION</div>
+                <a href="#power" class="nav-item" data-page="power">
+                    <i class="fas fa-bolt"></i><span>Power Distribution</span>
+                </a>
+                <a href="#fixtures" class="nav-item" data-page="fixtures">
+                    <i class="fas fa-lightbulb"></i><span>Fixture Patch</span>
+                </a>
+                <a href="#truckpack" class="nav-item" data-page="truckpack">
+                    <i class="fas fa-truck-loading"></i><span>Truck Packer</span>
+                </a>
+                <a href="#captureview" class="nav-item" data-page="captureview">
+                    <i class="fas fa-eye"></i><span>Capture Viewer</span>
+                </a>
+                <a href="#specifications" class="nav-item" data-page="specifications">
+                    <i class="fas fa-book"></i><span>Specifications</span>
+                </a>
+
                 <div class="nav-section-label">NETWORK</div>
                 <a href="#network" class="nav-item" data-page="network">
                     <i class="fas fa-network-wired"></i><span>Network Config</span>
@@ -158,7 +184,7 @@
                     <span class="engine-dot offline" id="engine-dot"></span>
                     <span id="engine-text">No Engine</span>
                 </div>
-                <div class="version-info">Luxor v1.2</div>
+                <div class="version-info">Luxor v1.3</div>
             </div>
         </aside>
 
@@ -221,6 +247,7 @@
     <script src="js/virtual-qlab.js"></script>
     <script src="js/virtual-disguise.js"></script>
     <script src="js/virtual-pixera.js"></script>
+    <script src="js/virtual-atem.js"></script>
     <script src="js/api.js"></script>
     <script src="js/resolume-api.js"></script>
     <script src="js/vmix-api.js"></script>
@@ -230,6 +257,7 @@
     <script src="js/qlab-api.js"></script>
     <script src="js/disguise-api.js"></script>
     <script src="js/pixera-api.js"></script>
+    <script src="js/atem-api.js"></script>
     <script src="js/websocket.js"></script>
     <script src="js/state.js"></script>
     <script src="js/components.js"></script>
@@ -255,7 +283,14 @@
     <script src="js/pages/intercom.js"></script>
     <script src="js/pages/pixlgrid.js"></script>
     <script src="js/pages/diagram.js"></script>
+    <script src="js/pages/stage3d.js"></script>
+    <script src="js/pages/ledpanel3d.js"></script>
     <script src="js/pages/ledconnect.js"></script>
+    <script src="js/pages/power.js"></script>
+    <script src="js/pages/fixtures.js"></script>
+    <script src="js/pages/truckpack.js"></script>
+    <script src="js/pages/captureview.js"></script>
+    <script src="js/pages/specifications.js"></script>
     <script src="js/pages/settings.js"></script>
     <script src="js/pages/logs.js"></script>
     <script src="js/app.js"></script>

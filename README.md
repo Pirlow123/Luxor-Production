@@ -1,20 +1,56 @@
-# Luxor Production v1.2
+# Luxor Production v1.3
 
 Universal production control platform for live events, broadcast, and AV installations.
 
 ## Features
 
-- **Media Server Control** — Hippotizer, Resolume Arena, vMix, CasparCG, OBS Studio, Barco E2/S3, QLab, Disguise, Pixera
+### Media Server Control
+- **Hippotizer** — Full REST API + WebSocket, timelines, media, mixes, presets, pins, timecode
+- **Resolume Arena** — Composition, clips, layers, effects, tempo, crossfader
+- **vMix** — Inputs, overlays, transitions, streaming, recording, audio
+- **CasparCG** — Channels, layers, templates, media playback
+- **OBS Studio** — Scenes, sources, streaming, recording, virtual cam
+- **Barco E2/S3** — Presets, screen destinations, layers, sources, aux
+- **QLab** — Workspaces, cues, groups, go/stop/pause, levels
+- **Disguise** — Transport, tracks, sections, annotations
+- **Pixera** — Timelines, cues, resources, screens, outputs
+- **Blackmagic ATEM** — Program/preview switching, transitions, USK/DSK, macros, media pool
+
+### LED & Processing
 - **LED Processor Control** — Novastar, Megapixel Helios, Brompton Tessera
+- **LED Calculator** — Panel layout calculator with pixel mapping and data rates
+- **LED Setup Calculator** — Full LED wall setup planning
+- **PIXL Grid** — Test pattern generator for LED walls and displays
+- **LED Auto-Connect** — Automatic LED processor port mapping and cabling
+- **Diagram Builder** — Visual signal flow routing with SVG/PNG export
+
+### 3D Tools
+- **3D Stage Visualizer** — Three.js stage scene with trusses, screens, lighting rigs
+- **3D LED Layout** — Three.js LED panel arrangement and visualization
+
+### Production Tools
+- **Power Distribution** — Distro mapping with Socapex, PowerCON, CEE, Powerlock, Camlock cables, canvas visualization
+- **Fixture Patch** — Eurotruss-based fixture layout with draggable fixtures, DMX universe/address, Fixture ID, ND, AC circuit, bulk tools
+- **Truck Packer** — 3D truck/container load planning with custom cases and weight tracking
+- **Capture Viewer** — Import Capture 2025 .c2p files, extract fixture/truss/scene data, 3D preview
+- **Specifications** — Full manufacturer specs for Robe, Acme, Chauvet, Martin, Clay Paky, GLP, ETC, Absen Polaris, Eurotruss, Movecat, Hippo Borealis, Barco E2, grandMA3, ChamSys, Yamaha, DiGiCo, Allen & Heath
+
+### Network & Control
 - **PTZ Camera Control** — Panasonic AW-HE/UE series, BirdDog (pan/tilt/zoom, presets, tally, focus, iris)
 - **Network Switch Monitoring** — Luminex GigaCore, LumiNode, Cameo XNode (ports, VLANs, PoE, LLDP)
 - **Lighting Console Integration** — grandMA3/MA2 Web Remote, Avolites Titan (executors, cues, playback)
 - **Intercom Systems** — Riedel Bolero / Artist (beltpacks, channels, antennas, matrix crosspoints)
-- **PIXL Grid** — Test pattern generator for LED walls and displays
-- **LED Calculator** — Panel layout calculator with pixel mapping
-- **Signal Flow Diagrams** — Visual signal routing builder with export
-- **Show Runner** — Cue list management and timecode integration
-- **System Status** — Unified health dashboard for all connected devices
+- **Network Config** — IP configuration and subnet management
+- **DMX / Art-Net** — Universe management and Art-Net routing
+- **Sync & Cluster** — Multi-server synchronization
+
+### System
+- **Show Runner** — Cue list management with timecode integration
+- **Dashboard** — Unified overview with quick actions
+- **System Status** — Health dashboard for all connected devices
+- **Event Log** — Activity and error logging
+- **Settings** — App configuration and preferences
+- **Project Files** — Save/load `.luxor` project files with full state
 
 ## Requirements
 
@@ -26,7 +62,7 @@ Universal production control platform for live events, broadcast, and AV install
 ### 1. Clone or download
 
 ```bash
-git clone <repository-url>
+git clone https://github.com/Pirlow123/luxor-production.git
 cd luxor-production
 ```
 
@@ -52,7 +88,7 @@ This launches the Electron desktop app.
 npm run build
 ```
 
-Output: `release/Luxor Production Setup 1.2.0.exe` (NSIS installer)
+Output: `release/Luxor Production 1.3 setup.exe` (NSIS installer)
 
 - Allows custom install directory
 - Creates desktop and Start Menu shortcuts
@@ -65,7 +101,7 @@ Output: `release/Luxor Production Setup 1.2.0.exe` (NSIS installer)
 npm run build:mac
 ```
 
-Output: `release/Luxor Production-1.2.0.dmg` and `release/Luxor Production-1.2.0-mac.zip`
+Output: `release/Luxor Production-1.3.0.dmg` and `release/Luxor Production-1.3.0-mac.zip`
 
 #### macOS installation steps:
 
@@ -97,7 +133,7 @@ npm run build:mac
 npm run build:linux
 ```
 
-Output: `release/Luxor Production-1.2.0.AppImage`
+Output: `release/Luxor Production-1.3.0.AppImage`
 
 ### All platforms
 
@@ -136,8 +172,41 @@ luxor-production/
     qlab-api.js       # QLab API client
     disguise-api.js   # Disguise API client
     pixera-api.js     # Pixera API client
+    atem-api.js       # Blackmagic ATEM API client
     websocket.js      # WebSocket callback client
-    pages/            # Page modules (dashboard, ptz, netswitch, lighting, intercom, etc.)
+    pages/            # Page modules
+      dashboard.js    # Dashboard overview
+      showrun.js      # Show runner / cue list
+      status.js       # System status
+      timelines.js    # Timeline control
+      media.js        # Media management
+      mixes.js        # Mixes & layers
+      presets.js      # Preset management
+      pins.js         # Pin control
+      timecode.js     # Timecode settings
+      composition.js  # Resolume composition
+      network.js      # Network configuration
+      dmx.js          # DMX / Art-Net
+      sync.js         # Sync & cluster
+      ledprocessor.js # LED processor control
+      ledcalc.js      # LED calculator
+      ledsetup.js     # LED setup calculator
+      pixlgrid.js     # PIXL Grid test patterns
+      diagram.js      # Signal flow diagram builder
+      ledconnect.js   # LED auto-connect
+      stage3d.js      # 3D stage visualizer
+      ledpanel3d.js   # 3D LED panel layout
+      power.js        # Power distribution
+      fixtures.js     # Fixture patch layout
+      truckpack.js    # Truck packer
+      captureview.js  # Capture 2025 viewer
+      specifications.js # Equipment specifications
+      ptz.js          # PTZ camera control
+      netswitch.js    # Network switch monitoring
+      lighting.js     # Lighting console integration
+      intercom.js     # Intercom systems
+      settings.js     # App settings
+      logs.js         # Event log
   assets/             # Icons and logos
   mock-server.js      # Virtual Hippotizer mock server for demos
   release/            # Build output directory

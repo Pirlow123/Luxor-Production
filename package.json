@@ -1,6 +1,6 @@
 {
   "name": "luxor-production",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "description": "Luxor Production — Universal control interface for media servers, LED processors, PTZ cameras, network switches, lighting consoles, and intercom systems",
   "main": "electron-main.js",
   "author": "Luxor Productions",
@@ -34,7 +34,8 @@
       "js/**/*",
       "assets/**/*",
       "mock-server.js",
-      "node_modules/ws/**/*"
+      "node_modules/ws/**/*",
+      "node_modules/xlsx/**/*"
     ],
     "win": {
       "target": [
@@ -54,7 +55,7 @@
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "shortcutName": "Luxor Production",
-      "artifactName": "Luxor Production 1.2 setup.${ext}"
+      "artifactName": "Luxor Production 1.3 setup.${ext}"
     },
     "mac": {
       "target": [

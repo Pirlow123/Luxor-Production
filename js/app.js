@@ -28,6 +28,13 @@ const HippoApp = {
         pixlgrid:     PixlGridPage,
         diagram:      DiagramPage,
         ledconnect:   LedConnectPage,
+        stage3d:      Stage3dPage,
+        ledpanel3d:   LedPanel3dPage,
+        power:        PowerDistPage,
+        fixtures:     FixturesPage,
+        truckpack:    TruckPackPage,
+        captureview:  CaptureViewPage,
+        specifications: SpecificationsPage,
         settings:     SettingsPage,
         logs:         LogsPage,
     },
@@ -72,7 +79,7 @@ const HippoApp = {
         // Hide nav until a server is connected
         this.updateNavVisibility(null);
 
-        appState.log('INFO', 'Luxor Production v1.2 started', 'System');
+        appState.log('INFO', 'Luxor Production v1.3 started', 'System');
     },
 
     // ================================================================
@@ -266,6 +273,9 @@ const HippoApp = {
             case 'pixera':
                 pixeraAPI.configure(server.host, server.port);
                 break;
+            case 'atem':
+                atemAPI.configure(server.host, server.port);
+                break;
             default:
                 hippoAPI.configure(server.host, server.port);
                 if (!isVirtual) hippoWS.configure(server.host, server.wsPort || 40513);
@@ -284,6 +294,7 @@ const HippoApp = {
                 case 'qlab': health = await qlabAPI.healthCheck(); break;
                 case 'disguise': health = await disguiseAPI.healthCheck(); break;
                 case 'pixera': health = await pixeraAPI.healthCheck(); break;
+                case 'atem': health = await atemAPI.healthCheck(); break;
                 default: health = await hippoAPI.healthCheck(); break;
             }
 
@@ -367,6 +378,13 @@ const HippoApp = {
                     if (screens) appState.set('pixeraScreens', screens);
                     break;
                 }
+                case 'atem': {
+                    const inputs = await atemAPI.getInputs().catch(() => null);
+                    if (inputs) appState.set('atemInputs', inputs);
+                    const audio = await atemAPI.getAudioMixer().catch(() => null);
+                    if (audio) appState.set('atemAudio', audio);
+                    break;
+                }
                 default:
                     await this.fetchInitialData();
                     break;
@@ -380,6 +398,7 @@ const HippoApp = {
                     case 'casparcg': this._virtualWs = VirtualCasparcg.createWebSocket(); break;
                     case 'obs': this._virtualWs = VirtualObs.createWebSocket(); break;
                     case 'qlab': this._virtualWs = VirtualQlab.createWebSocket(); break;
+                    case 'atem': this._virtualWs = VirtualAtem.createWebSocket(); break;
                     default: this._virtualWs = VirtualHippo.createWebSocket(); break;
                 }
                 this._virtualWs.addEventListener('open', () => {
@@ -440,6 +459,7 @@ const HippoApp = {
         if (typeof VirtualQlab !== 'undefined' && VirtualQlab.isActive()) VirtualQlab.deactivate();
         if (typeof VirtualDisguise !== 'undefined' && VirtualDisguise.isActive()) VirtualDisguise.deactivate();
         if (typeof VirtualPixera !== 'undefined' && VirtualPixera.isActive()) VirtualPixera.deactivate();
+        if (typeof VirtualAtem !== 'undefined' && VirtualAtem.isActive()) VirtualAtem.deactivate();
     },
 
     _activateAllVirtualServers() {
@@ -457,6 +477,7 @@ const HippoApp = {
             qlab:     (s) => typeof VirtualQlab !== 'undefined' && VirtualQlab.activate(),
             disguise: (s) => typeof VirtualDisguise !== 'undefined' && VirtualDisguise.activate(`http://${s.host}:${s.port}/api`),
             pixera:   (s) => typeof VirtualPixera !== 'undefined' && VirtualPixera.activate(`http://${s.host}:${s.port}`),
+            atem:     (s) => typeof VirtualAtem !== 'undefined' && VirtualAtem.activate(`http://${s.host}:${s.port}/api/v1/switcher`),
         };
         servers.forEach(s => {
             if (s.virtual) {
@@ -612,6 +633,17 @@ const HippoApp = {
                     if (timelines) appState.set('pixeraTimelines', timelines);
                     break;
                 }
+                case 'atem': {
+                    const atemInfo = await atemAPI.getDeviceInfo().catch(() => null);
+                    if (atemInfo) {
+                        appState.set('atemState', {
+                            ...atemInfo,
+                            program: atemInfo.program ?? appState.get('atemState')?.program,
+                            preview: atemInfo.preview ?? appState.get('atemState')?.preview,
+                        });
+                    }
+                    break;
+                }
                 default: {
                     const info = await hippoAPI.getInfo();
                     appState.set('serverInfo', info);
@@ -741,7 +773,7 @@ const HippoApp = {
     // NAV VISIBILITY — show/hide pages based on server type
     // ================================================================
     // Pages that are always visible (even when disconnected)
-    _alwaysVisiblePages: ['settings', 'logs', 'status', 'ledprocessor', 'ledcalc', 'ledsetup', 'pixlgrid', 'diagram', 'ledconnect', 'ptz', 'netswitch', 'lighting', 'intercom'],
+    _alwaysVisiblePages: ['settings', 'logs', 'status', 'ledprocessor', 'ledcalc', 'ledsetup', 'pixlgrid', 'diagram', 'ledconnect', 'ptz', 'netswitch', 'lighting', 'intercom', 'stage3d', 'ledpanel3d', 'power', 'fixtures', 'truckpack', 'captureview', 'specifications'],
 
     updateNavVisibility(serverType) {
         const nav = document.getElementById('sidebar-nav');
@@ -881,6 +913,7 @@ const HippoApp = {
         qlab:     { label: 'QLab', icon: 'fa-list-ol', color: '#8b5cf6', rgb: '139,92,246', desc: 'Show Control', sub: 'WebSocket (JSON)', port: 53000, wsPort: 53000, logo: 'assets/logos/qlab.svg' },
         disguise: { label: 'Disguise', icon: 'fa-cube', color: '#ec4899', rgb: '236,72,153', desc: 'Media Server', sub: 'REST API (JSON)', port: 80, wsPort: 80, logo: 'assets/logos/disguise.svg' },
         pixera:   { label: 'Pixera', icon: 'fa-layer-group', color: '#06b6d4', rgb: '6,182,212', desc: 'Media Server', sub: 'JSON-RPC 2.0', port: 1400, wsPort: 1400, logo: 'assets/logos/pixera.svg' },
+        atem:     { label: 'Blackmagic ATEM', icon: 'fa-random', color: '#facc15', rgb: '250,204,21', desc: 'Live Switcher', sub: 'REST API (JSON)', port: 80, wsPort: 80, logo: 'assets/logos/atem.svg' },
     },
 
     _renderAddServerDialog() {
@@ -1045,17 +1078,6 @@ const HippoApp = {
         if (!appState.get('connected')) { UI.toast('Not connected', 'warning'); return; }
         try { await hippoAPI.resetAll(); UI.toast('All timelines reset', 'info'); appState.log('INFO', 'Reset All', 'Transport'); }
         catch(e) { UI.toast(e.message, 'error'); }
-    },
-
-    async emergencyStop() {
-        if (!appState.get('connected')) return;
-        try {
-            await hippoAPI.stopAll();
-            // Also mute all
-            await hippoAPI.muteAll();
-            UI.toast('EMERGENCY STOP — All stopped and muted', 'warning');
-            appState.log('WARN', 'EMERGENCY STOP executed', 'Transport');
-        } catch(e) { UI.toast(e.message, 'error'); }
     },
 
     // Single timeline shortcuts (used by dashboard)
@@ -1367,6 +1389,32 @@ const HippoApp = {
                 case 'play':  await pixeraAPI.playTimeline(id); UI.toast(`Timeline ${id} play`, 'success'); break;
                 case 'pause': await pixeraAPI.pauseTimeline(id); UI.toast(`Timeline ${id} paused`, 'info'); break;
                 case 'stop':  await pixeraAPI.stopTimeline(id); UI.toast(`Timeline ${id} stopped`, 'info'); break;
+            }
+            this.refreshDashboard();
+        } catch (e) { UI.toast(e.message, 'error'); }
+    },
+
+    async atemDashAction(action, value) {
+        if (!appState.get('connected')) { UI.toast('Not connected', 'warning'); return; }
+        try {
+            switch (action) {
+                case 'cut':    await atemAPI.transitionCut(); UI.toast('Cut', 'success'); break;
+                case 'auto':   await atemAPI.transitionAuto(); UI.toast('Auto Transition', 'success'); break;
+                case 'ftb':    await atemAPI.fadeToBlack(); UI.toast('Fade to Black', 'info'); break;
+                case 'pgm':    await atemAPI.setProgram(value); UI.toast(`Input ${value} → Program`, 'success'); break;
+                case 'pvw':    await atemAPI.setPreview(value); UI.toast(`Input ${value} → Preview`, 'info'); break;
+                case 'stream':
+                    const as = appState.get('atemState') || {};
+                    if (as.streaming) { await atemAPI.stopStreaming(); UI.toast('Stream stopped', 'info'); }
+                    else { await atemAPI.startStreaming(); UI.toast('Stream started', 'success'); }
+                    break;
+                case 'record':
+                    const ar = appState.get('atemState') || {};
+                    if (ar.recording) { await atemAPI.stopRecording(); UI.toast('Recording stopped', 'info'); }
+                    else { await atemAPI.startRecording(); UI.toast('Recording started', 'success'); }
+                    break;
+                case 'dskAuto':  await atemAPI.dskAuto(value); UI.toast(`DSK ${value + 1} toggle`, 'info'); break;
+                case 'macro':    await atemAPI.macroRun(value); UI.toast(`Macro ${value} triggered`, 'success'); break;
             }
             this.refreshDashboard();
         } catch (e) { UI.toast(e.message, 'error'); }
