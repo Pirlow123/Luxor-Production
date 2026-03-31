@@ -241,20 +241,107 @@ const SettingsPage = {
                 </div>
             </div>
 
-            <!-- Connection Info -->
+            <!-- How to Use -->
             <div class="card mt-md">
-                <div class="card-header"><h3><i class="fas fa-info-circle"></i> Setup Guide</h3></div>
-                <div class="card-body" style="font-size:12px;color:var(--text-secondary);line-height:1.8;">
-                    <p><strong>1.</strong> Open Bitfocus Companion on your network</p>
-                    <p><strong>2.</strong> Go to Companion <strong>Settings</strong> and ensure <strong>Satellite</strong> is enabled</p>
-                    <p><strong>3.</strong> Default Satellite port is <code>16622</code> (TCP) or <code>16623</code> (WebSocket)</p>
-                    <p><strong>4.</strong> Enter the Companion IP above and click <strong>Save & Connect</strong></p>
-                    <p><strong>5.</strong> In Companion's <strong>Surfaces</strong> tab, you'll see <strong>"${UI.esc(cfg.deviceName)}"</strong> as a new surface</p>
-                    <p><strong>6.</strong> Configure buttons in Companion — they'll appear live in the grid above</p>
-                    <p style="margin-top:12px;padding:8px 12px;background:rgba(59,130,246,0.08);border:1px solid rgba(59,130,246,0.2);border-radius:var(--radius-sm);">
-                        <i class="fas fa-lightbulb" style="color:#3b82f6;"></i>
-                        <strong>Tip:</strong> Clicking a button in Luxor sends a press to Companion — same as pressing it on a physical Stream Deck.
-                    </p>
+                <div class="card-header"><h3><i class="fas fa-book-open"></i> How to Use</h3></div>
+                <div class="card-body" style="font-size:12px;color:var(--text-secondary);">
+
+                    <!-- What is this -->
+                    <div style="padding:12px 14px;background:rgba(59,130,246,0.06);border:1px solid rgba(59,130,246,0.15);border-radius:var(--radius);margin-bottom:16px;">
+                        <p style="font-weight:600;color:var(--text-primary);margin-bottom:6px;"><i class="fas fa-info-circle" style="color:#3b82f6;margin-right:6px;"></i>What is this?</p>
+                        <p style="line-height:1.7;">Luxor connects to <strong>Bitfocus Companion</strong> using the <strong>Satellite API</strong> and registers as a <strong>virtual Stream Deck</strong>.
+                        Any buttons you configure in Companion will appear live in the grid above. Clicking a button in Luxor is the same as pressing it on a physical Stream Deck —
+                        it triggers the actions you've configured in Companion (fire cues, switch scenes, control lights, etc.).</p>
+                    </div>
+
+                    <!-- Setup Steps -->
+                    <p style="font-weight:700;color:var(--text-primary);font-size:13px;margin-bottom:12px;"><i class="fas fa-cogs" style="color:var(--accent);margin-right:6px;"></i>Setup Steps</p>
+                    <div class="comp-steps">
+                        <div class="comp-step">
+                            <div class="comp-step-num">1</div>
+                            <div class="comp-step-content">
+                                <p class="comp-step-title">Open Bitfocus Companion</p>
+                                <p>Launch Companion on your machine or any machine on the same network. Open the Companion web GUI (usually <code>http://127.0.0.1:8000</code>).</p>
+                            </div>
+                        </div>
+                        <div class="comp-step">
+                            <div class="comp-step-num">2</div>
+                            <div class="comp-step-content">
+                                <p class="comp-step-title">Enable the Satellite API</p>
+                                <p>In Companion, go to the <strong>Settings</strong> tab. Find <strong>"Satellite"</strong> and make sure it's <strong>enabled</strong>.
+                                The default WebSocket port is <code>16623</code>. Don't change it unless you have a reason to.</p>
+                            </div>
+                        </div>
+                        <div class="comp-step">
+                            <div class="comp-step-num">3</div>
+                            <div class="comp-step-content">
+                                <p class="comp-step-title">Configure the connection in Luxor</p>
+                                <p>Enter the <strong>IP address</strong> of the machine running Companion above. If it's the same machine, use <code>127.0.0.1</code>.
+                                Set the port to <code>16623</code> (default). Choose your preferred <strong>grid size</strong> (columns x rows).</p>
+                            </div>
+                        </div>
+                        <div class="comp-step">
+                            <div class="comp-step-num">4</div>
+                            <div class="comp-step-content">
+                                <p class="comp-step-title">Connect</p>
+                                <p>Click <strong>"Save & Connect"</strong>. The status badge should change to <span style="color:#22c55e;font-weight:600;">Connected</span>.
+                                If it doesn't, click <strong>"Test Connection"</strong> to diagnose the issue.</p>
+                            </div>
+                        </div>
+                        <div class="comp-step">
+                            <div class="comp-step-num">5</div>
+                            <div class="comp-step-content">
+                                <p class="comp-step-title">Assign the surface in Companion</p>
+                                <p>Go to the <strong>Surfaces</strong> tab in Companion. You'll see <strong>"${UI.esc(cfg.deviceName)}"</strong> listed as a new surface.
+                                Click the <strong>page selector</strong> to assign which button page this surface shows.</p>
+                            </div>
+                        </div>
+                        <div class="comp-step">
+                            <div class="comp-step-num">6</div>
+                            <div class="comp-step-content">
+                                <p class="comp-step-title">Configure buttons</p>
+                                <p>Go to the <strong>Buttons</strong> tab in Companion. Configure your buttons with actions, feedbacks, and styles as usual.
+                                Everything you set up will appear <strong>live in the Luxor grid</strong> above — colors, text, and images.</p>
+                            </div>
+                        </div>
+                        <div class="comp-step">
+                            <div class="comp-step-num">7</div>
+                            <div class="comp-step-content">
+                                <p class="comp-step-title">Use it!</p>
+                                <p>Click any button in the Virtual Surface grid to trigger it. Hold a button for press-and-hold actions.
+                                It works exactly like a physical Stream Deck connected to Companion.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Use Cases -->
+                    <p style="font-weight:700;color:var(--text-primary);font-size:13px;margin:20px 0 12px;"><i class="fas fa-rocket" style="color:var(--accent);margin-right:6px;"></i>What Can You Do With This?</p>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px;">
+                        <div class="comp-usecase"><i class="fas fa-play" style="color:#22c55e;"></i><span>Fire show cues and timelines</span></div>
+                        <div class="comp-usecase"><i class="fas fa-exchange-alt" style="color:#3b82f6;"></i><span>Switch video sources on ATEM / E2</span></div>
+                        <div class="comp-usecase"><i class="fas fa-lightbulb" style="color:#f59e0b;"></i><span>Trigger lighting presets on grandMA3</span></div>
+                        <div class="comp-usecase"><i class="fas fa-volume-up" style="color:#a855f7;"></i><span>Mute/unmute audio channels</span></div>
+                        <div class="comp-usecase"><i class="fas fa-tv" style="color:#ec4899;"></i><span>Control Resolume / Hippo playback</span></div>
+                        <div class="comp-usecase"><i class="fas fa-camera" style="color:#06b6d4;"></i><span>Recall PTZ camera presets</span></div>
+                        <div class="comp-usecase"><i class="fas fa-th-large" style="color:#f97316;"></i><span>Run OBS scene transitions</span></div>
+                        <div class="comp-usecase"><i class="fas fa-headset" style="color:#ef4444;"></i><span>Trigger intercom talkback</span></div>
+                    </div>
+
+                    <!-- Troubleshooting -->
+                    <p style="font-weight:700;color:var(--text-primary);font-size:13px;margin-bottom:12px;"><i class="fas fa-wrench" style="color:var(--accent);margin-right:6px;"></i>Troubleshooting</p>
+                    <div style="font-size:11px;line-height:1.8;">
+                        <div class="comp-trouble"><strong>Can't connect?</strong> Make sure Companion is running, Satellite is enabled in Companion settings, and the IP/port are correct. Check your firewall isn't blocking port ${cfg.port}.</div>
+                        <div class="comp-trouble"><strong>Buttons not showing?</strong> After connecting, go to Companion's Surfaces tab and make sure the Luxor surface is assigned to a button page.</div>
+                        <div class="comp-trouble"><strong>Connection drops?</strong> Luxor auto-reconnects every 5 seconds. If Companion restarts, the connection will restore automatically.</div>
+                        <div class="comp-trouble"><strong>Wrong grid size?</strong> Change the columns/rows above, click Save & Connect. The surface will re-register with the new size. You may need to re-assign the surface page in Companion.</div>
+                    </div>
+
+                    <!-- Tip -->
+                    <div style="margin-top:16px;padding:10px 14px;background:rgba(34,197,94,0.06);border:1px solid rgba(34,197,94,0.15);border-radius:var(--radius);">
+                        <p style="font-weight:600;color:#22c55e;margin-bottom:4px;"><i class="fas fa-lightbulb" style="margin-right:6px;"></i>Pro Tip</p>
+                        <p style="line-height:1.7;">You can run Companion on a separate machine (e.g., a show network laptop) and connect Luxor to it remotely.
+                        Multiple Luxor instances can connect to the same Companion — each with a different Device ID — giving you multiple virtual panels across the team.</p>
+                    </div>
                 </div>
             </div>
         `;
