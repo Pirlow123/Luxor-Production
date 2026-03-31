@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 60">
+  <!-- OBS iconic lens/shutter logo -->
+  <g transform="translate(22, 8)">
+    <!-- Outer ring -->
+    <circle cx="22" cy="22" r="20" fill="none" stroke="#ffffff" stroke-width="2.5"/>
+    <!-- Three curved arc blades forming the shutter/lens shape -->
+    <path d="M22,4 C22,4 32,10 32,22" fill="none" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round"/>
+    <path d="M38,33 C38,33 28,38 18,32" fill="none" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round"/>
+    <path d="M6,33 C6,33 6,20 16,12" fill="none" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round"/>
+    <!-- Center dot -->
+    <circle cx="22" cy="22" r="4" fill="#ffffff" opacity="0.3"/>
+  </g>
+  <!-- OBS Studio text -->
+  <text x="80" y="38" font-family="'Segoe UI', 'Helvetica Neue', Arial, sans-serif" font-size="28" font-weight="800" fill="#ffffff" text-anchor="start" letter-spacing="3">OBS</text>
+  <text x="152" y="38" font-family="'Segoe UI', 'Helvetica Neue', Arial, sans-serif" font-size="11" font-weight="300" fill="#ffffff" text-anchor="start" letter-spacing="2" opacity="0.6">Studio</text>
+</svg>

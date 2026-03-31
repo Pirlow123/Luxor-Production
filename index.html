@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Luxor Production</title>
+    <link rel="icon" type="image/png" href="assets/logos/luxor.png">
+    <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="css/components.css">
+    <link rel="stylesheet" href="css/pages.css">
+    <link rel="stylesheet" href="css/showrun.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <div id="app">
+        <!-- Sidebar -->
+        <aside id="sidebar" class="sidebar">
+            <div class="sidebar-header">
+                <div class="logo">
+                    <img src="assets/logos/luxor.png" alt="Luxor" class="logo-img">
+                    <div class="logo-text">
+                        <span class="logo-sub">PRODUCTION</span>
+                    </div>
+                </div>
+                <button id="sidebar-toggle" class="sidebar-toggle" onclick="HippoApp.toggleSidebar()">
+                    <i class="fas fa-chevron-left"></i>
+                </button>
+            </div>
+
+            <div class="server-selector" id="server-selector">
+                <div class="server-selector-label">ACTIVE ENGINES</div>
+                <div id="server-list" style="display:flex;flex-direction:column;gap:4px;"></div>
+                <select id="server-select" style="display:none;" onchange="HippoApp.switchServer(this.value)">
+                    <option value="">-- Select Server --</option>
+                </select>
+                <div id="connection-status" class="connection-badge disconnected" style="display:none;">
+                    <span class="conn-dot"></span>
+                    <span id="conn-text">OFFLINE</span>
+                </div>
+                <button class="btn btn-xs btn-ghost w-full mt-sm" onclick="HippoApp.showAddServer()">
+                    <i class="fas fa-plus"></i> Add Server
+                </button>
+            </div>
+
+            <div class="server-selector" id="led-processor-selector">
+                <div class="server-selector-label">ACTIVE LED PROCESSORS</div>
+                <div id="led-processor-list" style="display:flex;flex-direction:column;gap:4px;"></div>
+                <button class="btn btn-xs btn-ghost w-full mt-sm" onclick="HippoApp.showAddLedProcessor()">
+                    <i class="fas fa-plus"></i> Add Processor
+                </button>
+            </div>
+
+            <div class="server-selector" id="ptz-camera-selector">
+                <div class="server-selector-label">ACTIVE CAMERAS</div>
+                <div id="ptz-camera-list" style="display:flex;flex-direction:column;gap:4px;"></div>
+                <button class="btn btn-xs btn-ghost w-full mt-sm" onclick="PtzPage.showAddCamera()">
+                    <i class="fas fa-plus"></i> Add Camera
+                </button>
+            </div>
+
+            <div class="server-selector" id="net-switch-selector">
+                <div class="server-selector-label">NETWORK SWITCHES / NODES</div>
+                <div id="net-switch-list" style="display:flex;flex-direction:column;gap:4px;"></div>
+                <button class="btn btn-xs btn-ghost w-full mt-sm" onclick="NetSwitchPage.showAddSwitch()">
+                    <i class="fas fa-plus"></i> Add Switch / Node
+                </button>
+            </div>
+
+            <div class="server-selector" id="lighting-console-selector">
+                <div class="server-selector-label">LIGHTING CONSOLES</div>
+                <div id="lighting-console-list" style="display:flex;flex-direction:column;gap:4px;"></div>
+                <button class="btn btn-xs btn-ghost w-full mt-sm" onclick="LightingPage.showAddConsole()">
+                    <i class="fas fa-plus"></i> Add Console
+                </button>
+            </div>
+
+            <div class="server-selector" id="intercom-selector">
+                <div class="server-selector-label">INTERCOM SYSTEMS</div>
+                <div id="intercom-list" style="display:flex;flex-direction:column;gap:4px;"></div>
+                <button class="btn btn-xs btn-ghost w-full mt-sm" onclick="IntercomPage.showAddSystem()">
+                    <i class="fas fa-plus"></i> Add Intercom
+                </button>
+            </div>
+
+            <nav class="sidebar-nav" id="sidebar-nav">
+                <div class="nav-section-label">CONTROL</div>
+                <a href="#showrun" class="nav-item" data-page="showrun">
+                    <i class="fas fa-theater-masks"></i><span>Show Run</span>
+                </a>
+                <a href="#dashboard" class="nav-item active" data-page="dashboard">
+                    <i class="fas fa-th-large"></i><span>Dashboard</span>
+                </a>
+                <a href="#status" class="nav-item" data-page="status">
+                    <i class="fas fa-server"></i><span>System Status</span>
+                </a>
+                <a href="#composition" class="nav-item" data-page="composition" style="display:none;">
+                    <i class="fas fa-th"></i><span>Composition</span>
+                </a>
+                <a href="#timelines" class="nav-item" data-page="timelines">
+                    <i class="fas fa-stream"></i><span>Timelines</span>
+                </a>
+                <a href="#media" class="nav-item" data-page="media">
+                    <i class="fas fa-photo-video"></i><span>Media</span>
+                </a>
+                <a href="#mixes" class="nav-item" data-page="mixes">
+                    <i class="fas fa-sliders-h"></i><span>Mixes & Layers</span>
+                </a>
+                <a href="#presets" class="nav-item" data-page="presets">
+                    <i class="fas fa-bookmark"></i><span>Presets</span>
+                </a>
+                <a href="#pins" class="nav-item" data-page="pins">
+                    <i class="fas fa-microchip"></i><span>Pin Control</span>
+                </a>
+                <a href="#timecode" class="nav-item" data-page="timecode">
+                    <i class="fas fa-clock"></i><span>Timecode</span>
+                </a>
+
+                <div class="nav-section-label">LED TOOLS</div>
+                <a href="#ledcalc" class="nav-item" data-page="ledcalc">
+                    <i class="fas fa-calculator"></i><span>LED Calculator</span>
+                </a>
+                <a href="#ledsetup" class="nav-item" data-page="ledsetup">
+                    <i class="fas fa-hard-hat"></i><span>LED Setup Calc</span>
+                </a>
+                <a href="#pixlgrid" class="nav-item" data-page="pixlgrid">
+                    <i class="fas fa-th"></i><span>PIXL Grid</span>
+                </a>
+                <a href="#diagram" class="nav-item" data-page="diagram">
+                    <i class="fas fa-project-diagram"></i><span>Diagram Builder</span>
+                </a>
+                <a href="#ledconnect" class="nav-item" data-page="ledconnect">
+                    <i class="fas fa-plug"></i><span>LED Auto-Connect</span>
+                </a>
+
+                <div class="nav-section-label">NETWORK</div>
+                <a href="#network" class="nav-item" data-page="network">
+                    <i class="fas fa-network-wired"></i><span>Network Config</span>
+                </a>
+                <a href="#dmx" class="nav-item" data-page="dmx">
+                    <i class="fas fa-lightbulb"></i><span>DMX / Art-Net</span>
+                </a>
+                <a href="#sync" class="nav-item" data-page="sync">
+                    <i class="fas fa-sync-alt"></i><span>Sync & Cluster</span>
+                </a>
+
+                <div class="nav-section-label">SYSTEM</div>
+                <a href="#settings" class="nav-item" data-page="settings">
+                    <i class="fas fa-cog"></i><span>Settings</span>
+                </a>
+                <a href="#logs" class="nav-item" data-page="logs">
+                    <i class="fas fa-terminal"></i><span>Event Log</span>
+                </a>
+            </nav>
+
+            <div class="sidebar-footer" id="sidebar-footer">
+                <div class="engine-status">
+                    <span class="engine-dot offline" id="engine-dot"></span>
+                    <span id="engine-text">No Engine</span>
+                </div>
+                <div class="version-info">Luxor v1.2</div>
+            </div>
+        </aside>
+
+        <!-- Main -->
+        <main id="main-content" class="main-content">
+            <header class="topbar">
+                <div class="topbar-left">
+                    <button class="btn btn-icon btn-ghost mobile-menu" onclick="HippoApp.toggleSidebar()">
+                        <i class="fas fa-bars"></i>
+                    </button>
+                    <h1 id="page-title">Dashboard</h1>
+                    <span id="page-subtitle" class="topbar-subtitle"></span>
+                </div>
+                <div class="topbar-center"></div>
+                <div class="topbar-right">
+                    <div class="topbar-stat clickable" id="stat-engine" onclick="HippoApp.navigate('status')" title="Click to view System Status">
+                        <i class="fas fa-circle" id="topbar-conn-dot" style="font-size:8px;color:var(--text-muted);"></i>
+                        <span id="engine-status-text">--</span>
+                    </div>
+                    <div class="topbar-stat" id="stat-server-info" style="display:none;">
+                        <i class="fas fa-network-wired" style="font-size:10px;"></i>
+                        <span id="server-ip-text" class="mono" style="font-size:10px;">--</span>
+                    </div>
+                    <div class="topbar-stat" id="stat-media">
+                        <i class="fas fa-database"></i>
+                        <span id="media-status-text">--</span>
+                    </div>
+                    <div class="ws-badge" id="ws-badge" title="WebSocket Status">
+                        <i class="fas fa-bolt"></i>
+                    </div>
+                </div>
+            </header>
+
+            <div id="page-container" class="page-container"></div>
+        </main>
+    </div>
+
+    <!-- Modal -->
+    <div id="modal-overlay" class="modal-overlay hidden">
+        <div id="modal-content" class="modal-content">
+            <div class="modal-header">
+                <h3 id="modal-title"></h3>
+                <button class="modal-close" onclick="HippoApp.closeModal()">&times;</button>
+            </div>
+            <div id="modal-body" class="modal-body"></div>
+            <div id="modal-footer" class="modal-footer"></div>
+        </div>
+    </div>
+
+    <!-- Toast -->
+    <div id="toast-container" class="toast-container"></div>
+
+    <!-- Scripts (order matters) -->
+    <script src="js/virtual-hippo.js"></script>
+    <script src="js/virtual-resolume.js"></script>
+    <script src="js/virtual-vmix.js"></script>
+    <script src="js/virtual-casparcg.js"></script>
+    <script src="js/virtual-obs.js"></script>
+    <script src="js/virtual-barco.js"></script>
+    <script src="js/virtual-qlab.js"></script>
+    <script src="js/virtual-disguise.js"></script>
+    <script src="js/virtual-pixera.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/resolume-api.js"></script>
+    <script src="js/vmix-api.js"></script>
+    <script src="js/casparcg-api.js"></script>
+    <script src="js/obs-api.js"></script>
+    <script src="js/barco-api.js"></script>
+    <script src="js/qlab-api.js"></script>
+    <script src="js/disguise-api.js"></script>
+    <script src="js/pixera-api.js"></script>
+    <script src="js/websocket.js"></script>
+    <script src="js/state.js"></script>
+    <script src="js/components.js"></script>
+    <script src="js/pages/composition.js"></script>
+    <script src="js/pages/showrun.js"></script>
+    <script src="js/pages/dashboard.js"></script>
+    <script src="js/pages/status.js"></script>
+    <script src="js/pages/timelines.js"></script>
+    <script src="js/pages/media.js"></script>
+    <script src="js/pages/mixes.js"></script>
+    <script src="js/pages/presets.js"></script>
+    <script src="js/pages/pins.js"></script>
+    <script src="js/pages/timecode.js"></script>
+    <script src="js/pages/network.js"></script>
+    <script src="js/pages/dmx.js"></script>
+    <script src="js/pages/sync.js"></script>
+    <script src="js/pages/ledprocessor.js"></script>
+    <script src="js/pages/ledcalc.js"></script>
+    <script src="js/pages/ledsetup.js"></script>
+    <script src="js/pages/ptz.js"></script>
+    <script src="js/pages/netswitch.js"></script>
+    <script src="js/pages/lighting.js"></script>
+    <script src="js/pages/intercom.js"></script>
+    <script src="js/pages/pixlgrid.js"></script>
+    <script src="js/pages/diagram.js"></script>
+    <script src="js/pages/ledconnect.js"></script>
+    <script src="js/pages/settings.js"></script>
+    <script src="js/pages/logs.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>

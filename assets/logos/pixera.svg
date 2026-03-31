@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 60">
+  <!-- Pixel grid accent (AV Stumpfl / Pixera branding) -->
+  <g transform="translate(6, 12)" opacity="0.5">
+    <rect x="0" y="0" width="6" height="6" fill="#06b6d4" rx="1"/>
+    <rect x="8" y="0" width="6" height="6" fill="#06b6d4" rx="1" opacity="0.6"/>
+    <rect x="0" y="8" width="6" height="6" fill="#06b6d4" rx="1" opacity="0.7"/>
+    <rect x="8" y="8" width="6" height="6" fill="#06b6d4" rx="1"/>
+    <rect x="0" y="16" width="6" height="6" fill="#06b6d4" rx="1" opacity="0.4"/>
+    <rect x="8" y="16" width="6" height="6" fill="#06b6d4" rx="1" opacity="0.8"/>
+    <rect x="16" y="0" width="6" height="6" fill="#06b6d4" rx="1" opacity="0.3"/>
+    <rect x="16" y="8" width="6" height="6" fill="#06b6d4" rx="1" opacity="0.5"/>
+    <rect x="16" y="16" width="6" height="6" fill="#06b6d4" rx="1" opacity="0.9"/>
+  </g>
+  <!-- PIXERA text -->
+  <text x="120" y="36" font-family="'Segoe UI', 'Helvetica Neue', Arial, sans-serif" font-size="26" font-weight="700" fill="#ffffff" text-anchor="middle" letter-spacing="5">PIXERA</text>
+  <!-- Cyan underline accent -->
+  <rect x="60" y="46" width="120" height="1.5" fill="#06b6d4" rx="0.75" opacity="0.5"/>
+</svg>

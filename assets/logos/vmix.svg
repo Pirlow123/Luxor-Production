@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 60">
+  <!-- Blue accent bar on left -->
+  <rect x="8" y="10" width="4" height="40" rx="2" fill="#3b82f6"/>
+  <!-- vMix text with proper casing -->
+  <text x="108" y="40" font-family="'Segoe UI', 'Helvetica Neue', Arial, sans-serif" font-size="32" fill="#ffffff" text-anchor="middle">
+    <tspan font-weight="300" font-style="italic" fill="#3b82f6">v</tspan><tspan font-weight="700" font-size="34">M</tspan><tspan font-weight="400">ix</tspan>
+  </text>
+</svg>

@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 60">
+  <!-- Stylized Q icon with extended tail (QLab's signature) -->
+  <g transform="translate(18, 8)">
+    <circle cx="20" cy="18" r="15" fill="none" stroke="#8b5cf6" stroke-width="3"/>
+    <!-- Extended Q tail -->
+    <line x1="28" y1="28" x2="40" y2="42" stroke="#8b5cf6" stroke-width="3.5" stroke-linecap="round"/>
+  </g>
+  <!-- QLab text -->
+  <text x="120" y="38" font-family="'Segoe UI', 'Helvetica Neue', Arial, sans-serif" font-size="30" fill="#ffffff" text-anchor="middle">
+    <tspan font-weight="700">Q</tspan><tspan font-weight="300">Lab</tspan>
+  </text>
+  <!-- Figure 53 subtle credit -->
+  <text x="178" y="52" font-family="'Segoe UI', 'Helvetica Neue', Arial, sans-serif" font-size="7" font-weight="300" fill="#8b5cf6" text-anchor="end" opacity="0.5">Figure 53</text>
+</svg>

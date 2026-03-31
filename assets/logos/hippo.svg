@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 60">
+  <!-- Horse head silhouette icon -->
+  <g transform="translate(8, 6) scale(0.52)">
+    <path d="M12,8 C10,4 14,1 18,2 C20,2.5 21,4 22,6 L24,5 C26,4 28,5 27,7 L25,9 C26,12 26,16 25,20 L25,45 C25,47 23,48 21,48 L19,48 C17,48 16,47 16,45 L16,38 C14,40 11,42 9,42 L7,48 C7,48 5,48 4,46 L4,44 C3,42 4,40 5,38 L8,32 C4,28 2,22 3,16 C4,12 7,10 12,8 Z M17,10 C16,10 15,11 16,12 C17,13 18,12 18,11 C18,10 17.5,10 17,10 Z" fill="#00d4aa"/>
+  </g>
+  <!-- HIPPOTIZER text -->
+  <text x="118" y="33" font-family="'Segoe UI', 'Helvetica Neue', Arial, sans-serif" font-size="21" font-weight="800" fill="#ffffff" text-anchor="middle" letter-spacing="3">HIPPOTIZER</text>
+  <!-- Subtle brand underline -->
+  <line x1="52" y1="42" x2="184" y2="42" stroke="#00d4aa" stroke-width="1.5" opacity="0.6"/>
+</svg>

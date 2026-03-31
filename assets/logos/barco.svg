@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 60">
+  <!-- BARCO corporate logo -->
+  <text x="100" y="30" font-family="'Segoe UI', 'Helvetica Neue', Arial, sans-serif" font-size="28" font-weight="800" fill="#ffffff" text-anchor="middle" letter-spacing="6">BARCO</text>
+  <!-- E2/S3 subtitle -->
+  <text x="100" y="46" font-family="'Segoe UI', 'Helvetica Neue', Arial, sans-serif" font-size="12" font-weight="600" fill="#ef4444" text-anchor="middle" letter-spacing="3">E2 / S3</text>
+  <!-- Red accent line above -->
+  <rect x="30" y="10" width="140" height="2" fill="#ef4444" rx="1"/>
+</svg>

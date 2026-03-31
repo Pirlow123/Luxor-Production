@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 60">
+  <!-- Play triangle icon (Resolume's signature element) -->
+  <g transform="translate(6, 10)">
+    <polygon points="0,0 0,40 34,20" fill="none" stroke="#a855f7" stroke-width="2.5" stroke-linejoin="round"/>
+    <polygon points="8,8 8,32 26,20" fill="#a855f7" opacity="0.3"/>
+  </g>
+  <!-- RESOLUME text - angular geometric style -->
+  <text x="124" y="36" font-family="'Segoe UI', 'Helvetica Neue', Arial, sans-serif" font-size="22" font-weight="800" fill="#ffffff" text-anchor="middle" letter-spacing="4">RESOLUME</text>
+  <!-- Subtle bottom accent -->
+  <rect x="48" y="46" width="152" height="1.5" fill="#a855f7" opacity="0.4" rx="0.75"/>
+</svg>

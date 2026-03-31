@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 470 520" fill="none">
+  <g fill="#4CB5E0">
+    <!-- Right barn door / main housing top-right -->
+    <path d="M200,5 L430,5 Q445,5 448,18 L465,115 Q468,130 455,135 L245,95 Z"/>
+    <!-- Main light body -->
+    <path d="M120,80 L380,40 Q395,38 400,52 L440,290 Q445,310 425,315 L55,315 Q35,315 38,295 L85,100 Q88,85 105,82 Z"/>
+    <!-- Left barn door -->
+    <path d="M50,95 L100,82 L65,285 L10,275 Q-5,272 0,255 L30,110 Q33,95 50,95 Z"/>
+    <!-- Lens outer ring -->
+    <circle cx="235" cy="195" r="95" fill="none" stroke="#4CB5E0" stroke-width="14"/>
+    <!-- Lens inner (cutout) -->
+    <circle cx="235" cy="195" r="82" fill="white"/>
+    <!-- Bottom handle/yoke -->
+    <path d="M140,315 L330,315 L310,350 Q305,360 290,360 L180,360 Q165,360 160,350 Z"/>
+  </g>
+  <!-- LUXOR text -->
+  <text x="235" y="490" text-anchor="middle" font-family="Arial Black,Arial,Helvetica,sans-serif" font-weight="900" font-size="120" letter-spacing="4" fill="#4CB5E0">LUXOR</text>
+</svg>
