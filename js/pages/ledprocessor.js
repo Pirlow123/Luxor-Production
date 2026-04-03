@@ -9,6 +9,7 @@ const LedProcessorPage = {
     _processors: [],  // { id, name, type, host, port, online }
     _activeProc: null,
     _status: {},
+    _isActive: false,
     _pollTimer: null,
 
     // All supported Novastar processor models grouped by line
@@ -127,11 +128,11 @@ const LedProcessorPage = {
                     <input type="range" class="led-brightness-slider" min="0" max="100" value="${s.brightness ?? 100}"
                         oninput="LedProcessorPage.setBrightness(this.value)">
                     <div class="led-brightness-presets">
-                        <button class="led-pbtn" onclick="LedProcessorPage.setBrightness(100)">100%</button>
-                        <button class="led-pbtn" onclick="LedProcessorPage.setBrightness(75)">75%</button>
-                        <button class="led-pbtn" onclick="LedProcessorPage.setBrightness(50)">50%</button>
-                        <button class="led-pbtn" onclick="LedProcessorPage.setBrightness(25)">25%</button>
                         <button class="led-pbtn" onclick="LedProcessorPage.setBrightness(0)">0%</button>
+                        <button class="led-pbtn" onclick="LedProcessorPage.setBrightness(25)">25%</button>
+                        <button class="led-pbtn" onclick="LedProcessorPage.setBrightness(50)">50%</button>
+                        <button class="led-pbtn" onclick="LedProcessorPage.setBrightness(75)">75%</button>
+                        <button class="led-pbtn" onclick="LedProcessorPage.setBrightness(100)">100%</button>
                     </div>
                 </div>
             </div>
@@ -1129,14 +1130,14 @@ const LedProcessorPage = {
         };
     },
 
-    selectProcessor(id) {
+    async selectProcessor(id) {
         const proc = this._processors.find(p => p.id === id);
         this._activeProc = proc || null;
         if (proc?.virtual) {
             this._status = this._virtualStatus(proc.type);
         } else {
             this._status = { online: false };
-            if (proc) this._fetchStatus();
+            if (proc) await this._fetchStatus();
         }
         this.refresh();
     },
@@ -1195,13 +1196,17 @@ const LedProcessorPage = {
             if (this._activeProc) this._activeProc.online = false;
         }
 
-        // Refresh UI if status changed
+        // Refresh UI if status changed and page is active
         if (wasOnline !== this._status.online) {
-            this.refresh();
+            if (this._isActive) this.refresh();
             this._saveProcessors();
         }
-        // Update inline status elements
-        this._updateStatusDisplay();
+        // Always update sidebar dots so status stays current
+        if (typeof HippoApp !== 'undefined' && HippoApp.renderLedProcessorList) {
+            HippoApp.renderLedProcessorList();
+        }
+        // Update inline status elements only when page is active
+        if (this._isActive) this._updateStatusDisplay();
     },
 
     _updateStatusDisplay() {
@@ -1250,17 +1255,21 @@ const LedProcessorPage = {
     },
 
     onActivate() {
+        this._isActive = true;
         this._loadProcessors();
         this.refresh();
         // Poll status every 5 seconds for live data updates
         if (this._activeProc && !this._activeProc.virtual) this._fetchStatus();
-        this._pollTimer = setInterval(() => {
-            if (this._activeProc && !this._activeProc.virtual) this._fetchStatus();
-        }, 5000);
+        if (!this._pollTimer) {
+            this._pollTimer = setInterval(() => {
+                if (this._activeProc && !this._activeProc.virtual) this._fetchStatus();
+            }, 5000);
+        }
     },
 
     onDeactivate() {
-        if (this._pollTimer) { clearInterval(this._pollTimer); this._pollTimer = null; }
+        this._isActive = false;
+        // Timer keeps running in background
     },
 };
 

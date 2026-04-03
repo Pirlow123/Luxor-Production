@@ -7,6 +7,7 @@ const LightingPage = {
     // ---- Console Database ----
     _consoles: [], // { id, name, type: 'ma'|'titan', model, ip, connected, lastSeen, status }
     _selectedId: null,
+    _isActive: false,
     _pollTimer: null,
     _pollInterval: 2000,
 
@@ -469,11 +470,14 @@ const LightingPage = {
         appState.log('INFO', `Lighting console removed: ${con?.name}`, 'Lighting');
     },
 
-    selectConsole(id) {
+    async selectConsole(id) {
         this._selectedId = id;
         this._refreshAll();
         const con = this._getSelected();
-        if (con) this._checkConnection(con);
+        if (con && !con.virtual) {
+            await this._checkConnection(con);
+            if (con.connected) await this.refreshConsole(con.id);
+        }
     },
 
     _getSelected() {
@@ -493,7 +497,7 @@ const LightingPage = {
             const d = JSON.parse(localStorage.getItem('luxor_lighting_consoles') || '[]');
             this._consoles = d.map(c => ({ ...c, connected: false, lastSeen: null, status: {} }));
             const virt = JSON.parse(localStorage.getItem('luxor_lighting_consoles_virtual') || '[]');
-            virt.forEach(v => { if (!this._consoles.find(c => c.id === v.id)) this._consoles.push(v); });
+            virt.forEach(v => { if (!this._consoles.find(c => c.id === v.id)) this._consoles.push({ ...v, connected: true }); });
             if (this._consoles.length > 0 && !this._selectedId) this._selectedId = this._consoles[0].id;
         } catch { this._consoles = []; }
     },
@@ -619,24 +623,22 @@ const LightingPage = {
         const container = document.getElementById('lighting-console-list');
         if (!container) return;
         if (this._consoles.length === 0) {
-            container.innerHTML = '<div style="font-size:10px;color:var(--text-muted);text-align:center;padding:4px">No consoles</div>';
+            container.innerHTML = '';
             return;
         }
         container.innerHTML = this._consoles.map(c => {
-            const dot = c.connected ? 'var(--green)' : 'var(--red)';
+            const dot = c.connected ? '#4ade80' : '#ef4444';
             const brand = c.type === 'ma' ? 'MA' : 'Avolites';
             return `
-                <div class="server-card" style="cursor:pointer" onclick="LightingPage.selectConsole('${c.id}');HippoApp.navigate('lighting')">
-                    <div style="display:flex;align-items:center;gap:6px">
-                        <div style="width:6px;height:6px;border-radius:50%;background:${dot};flex-shrink:0"></div>
-                        <div style="flex:1;min-width:0">
-                            <div style="font-weight:600;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${UI.esc(c.name)}</div>
-                            <div style="font-size:9px;color:var(--text-muted)">${brand} ${UI.esc(c.model)}</div>
-                        </div>
-                        <button class="server-card-remove" onclick="event.stopPropagation();LightingPage.removeConsole('${c.id}')" title="Remove">
-                            <i class="fas fa-times"></i>
-                        </button>
+                <div class="sidebar-device-card" onclick="LightingPage.selectConsole('${c.id}');HippoApp.navigate('lighting')">
+                    <span class="device-dot" style="background:${dot}"></span>
+                    <div class="device-info">
+                        <div class="device-name">${UI.esc(c.name)}</div>
+                        <div class="device-sub">${brand} ${UI.esc(c.model)}</div>
                     </div>
+                    <button class="device-remove" onclick="event.stopPropagation();LightingPage.removeConsole('${c.id}')" title="Remove">
+                        <i class="fas fa-times"></i>
+                    </button>
                 </div>`;
         }).join('');
     },
@@ -715,23 +717,34 @@ const LightingPage = {
     },
 
     _startPolling() {
-        this._stopPolling();
-        this._pollTimer = setInterval(() => this._pollAll(), this._pollInterval);
+        if (!this._pollTimer) {
+            this._pollTimer = setInterval(() => this._pollAll(), this._pollInterval);
+        }
     },
 
     _stopPolling() {
         if (this._pollTimer) { clearInterval(this._pollTimer); this._pollTimer = null; }
     },
 
+    _pollCount: 0,
+
     async _pollAll() {
+        this._pollCount++;
         for (const con of this._consoles) {
+            if (con.virtual) continue;
             await this._checkConnection(con);
+            // Full data refresh every 5th poll for the selected console
+            if (con.connected && con.id === this._selectedId && this._pollCount % 5 === 0) {
+                await this.refreshConsole(con.id);
+            }
         }
     },
 
     _updateList() {
-        const list = document.getElementById('lc-console-list');
-        if (list) list.innerHTML = this._renderConsoleList();
+        if (this._isActive) {
+            const list = document.getElementById('lc-console-list');
+            if (list) list.innerHTML = this._renderConsoleList();
+        }
         this.renderSidebarList();
     },
 
@@ -745,13 +758,22 @@ const LightingPage = {
     },
 
     onActivate() {
+        this._isActive = true;
         this._loadConsoles();
         this._initVirtualDemo();
         this._startPolling();
         this.renderSidebarList();
+        // Immediately fetch full data for the selected console
+        const con = this._getSelected();
+        if (con && !con.virtual) {
+            this._checkConnection(con).then(() => {
+                if (con.connected) this.refreshConsole(con.id);
+            });
+        }
     },
 
     onDeactivate() {
-        this._stopPolling();
+        this._isActive = false;
+        // Timer keeps running in background
     },
 };

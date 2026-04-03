@@ -7,6 +7,7 @@ const NetSwitchPage = {
     // ---- Switch Database ----
     _switches: [], // { id, name, type, model, ip, connected, lastSeen, status }
     _selectedId: null,
+    _isActive: false,
     _pollTimer: null,
     _pollInterval: 3000,
 
@@ -635,11 +636,14 @@ const NetSwitchPage = {
         appState.log('INFO', `Network switch removed: ${sw?.name}`, 'Network');
     },
 
-    selectSwitch(id) {
+    async selectSwitch(id) {
         this._selectedId = id;
         this._refreshAll();
         const sw = this._getSelected();
-        if (sw) this._checkConnection(sw);
+        if (sw && !sw.virtual) {
+            await this._checkConnection(sw);
+            if (sw.connected) await this.refreshSwitch(sw.id);
+        }
     },
 
     _getSelected() {
@@ -659,7 +663,7 @@ const NetSwitchPage = {
             const d = JSON.parse(localStorage.getItem('luxor_net_switches') || '[]');
             this._switches = d.map(s => ({ ...s, connected: false, lastSeen: null, status: {} }));
             const virt = JSON.parse(localStorage.getItem('luxor_net_switches_virtual') || '[]');
-            virt.forEach(v => { if (!this._switches.find(s => s.id === v.id)) this._switches.push(v); });
+            virt.forEach(v => { if (!this._switches.find(s => s.id === v.id)) this._switches.push({ ...v, connected: true }); });
             if (this._switches.length > 0 && !this._selectedId) this._selectedId = this._switches[0].id;
         } catch { this._switches = []; }
     },
@@ -906,24 +910,22 @@ const NetSwitchPage = {
         const container = document.getElementById('net-switch-list');
         if (!container) return;
         if (this._switches.length === 0) {
-            container.innerHTML = '<div style="font-size:10px;color:var(--text-muted);text-align:center;padding:4px">No switches</div>';
+            container.innerHTML = '';
             return;
         }
         container.innerHTML = this._switches.map(s => {
-            const dot = s.connected ? 'var(--green)' : 'var(--red)';
+            const dot = s.connected ? '#4ade80' : '#ef4444';
             const typeLabel = s.type === 'luminode' ? 'LumiNode' : s.type === 'cameo' ? 'Cameo' : 'GigaCore';
             return `
-                <div class="server-card" style="cursor:pointer" onclick="NetSwitchPage.selectSwitch('${s.id}');HippoApp.navigate('netswitch')">
-                    <div style="display:flex;align-items:center;gap:6px">
-                        <div style="width:6px;height:6px;border-radius:50%;background:${dot};flex-shrink:0"></div>
-                        <div style="flex:1;min-width:0">
-                            <div style="font-weight:600;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${UI.esc(s.name)}</div>
-                            <div style="font-size:9px;color:var(--text-muted)">${typeLabel} ${UI.esc(s.model)}</div>
-                        </div>
-                        <button class="server-card-remove" onclick="event.stopPropagation();NetSwitchPage.removeSwitch('${s.id}')" title="Remove">
-                            <i class="fas fa-times"></i>
-                        </button>
+                <div class="sidebar-device-card" onclick="NetSwitchPage.selectSwitch('${s.id}');HippoApp.navigate('netswitch')">
+                    <span class="device-dot" style="background:${dot}"></span>
+                    <div class="device-info">
+                        <div class="device-name">${UI.esc(s.name)}</div>
+                        <div class="device-sub">${typeLabel} ${UI.esc(s.model)}</div>
                     </div>
+                    <button class="device-remove" onclick="event.stopPropagation();NetSwitchPage.removeSwitch('${s.id}')" title="Remove">
+                        <i class="fas fa-times"></i>
+                    </button>
                 </div>`;
         }).join('');
     },
@@ -1043,8 +1045,9 @@ const NetSwitchPage = {
     // POLLING / LIFECYCLE
     // ============================================================
     _startPolling() {
-        this._stopPolling();
-        this._pollTimer = setInterval(() => this._pollAll(), this._pollInterval);
+        if (!this._pollTimer) {
+            this._pollTimer = setInterval(() => this._pollAll(), this._pollInterval);
+        }
     },
 
     _stopPolling() {
@@ -1066,8 +1069,10 @@ const NetSwitchPage = {
     },
 
     _updateList() {
-        const list = document.getElementById('ns-switch-list');
-        if (list) list.innerHTML = this._renderSwitchList();
+        if (this._isActive) {
+            const list = document.getElementById('ns-switch-list');
+            if (list) list.innerHTML = this._renderSwitchList();
+        }
         this.renderSidebarList();
     },
 
@@ -1081,13 +1086,22 @@ const NetSwitchPage = {
     },
 
     onActivate() {
+        this._isActive = true;
         this._loadSwitches();
         this._initVirtualDemo();
         this._startPolling();
         this.renderSidebarList();
+        // Immediately fetch full data for the selected switch
+        const sw = this._getSelected();
+        if (sw && !sw.virtual) {
+            this._checkConnection(sw).then(() => {
+                if (sw.connected) this.refreshSwitch(sw.id);
+            });
+        }
     },
 
     onDeactivate() {
-        this._stopPolling();
+        this._isActive = false;
+        // Timer keeps running in background
     },
 };

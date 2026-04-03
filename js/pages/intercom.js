@@ -8,6 +8,7 @@ const IntercomPage = {
     // ---- System Database ----
     _systems: [], // { id, name, type: 'bolero', model, ip, connected, lastSeen, status }
     _selectedId: null,
+    _isActive: false,
     _pollTimer: null,
     _pollInterval: 2000,
 
@@ -507,11 +508,14 @@ const IntercomPage = {
         appState.log('INFO', `Intercom system removed: ${sys?.name}`, 'Intercom');
     },
 
-    selectSystem(id) {
+    async selectSystem(id) {
         this._selectedId = id;
         this._refreshAll();
         const sys = this._getSelected();
-        if (sys) this._checkConnection(sys);
+        if (sys && !sys.virtual) {
+            await this._checkConnection(sys);
+            if (sys.connected) await this.refreshSystem(sys.id);
+        }
     },
 
     _getSelected() {
@@ -531,7 +535,7 @@ const IntercomPage = {
             const d = JSON.parse(localStorage.getItem('luxor_intercom_systems') || '[]');
             this._systems = d.map(s => ({ ...s, connected: false, lastSeen: null, status: {} }));
             const virt = JSON.parse(localStorage.getItem('luxor_intercom_systems_virtual') || '[]');
-            virt.forEach(v => { if (!this._systems.find(s => s.id === v.id)) this._systems.push(v); });
+            virt.forEach(v => { if (!this._systems.find(s => s.id === v.id)) this._systems.push({ ...v, connected: true }); });
             if (this._systems.length > 0 && !this._selectedId) this._selectedId = this._systems[0].id;
         } catch { this._systems = []; }
     },
@@ -707,23 +711,21 @@ const IntercomPage = {
         const container = document.getElementById('intercom-list');
         if (!container) return;
         if (this._systems.length === 0) {
-            container.innerHTML = '<div style="font-size:10px;color:var(--text-muted);text-align:center;padding:4px">No intercom systems</div>';
+            container.innerHTML = '';
             return;
         }
         container.innerHTML = this._systems.map(s => {
-            const dot = s.connected ? 'var(--green)' : 'var(--red)';
+            const dot = s.connected ? '#4ade80' : '#ef4444';
             return `
-                <div class="server-card" style="cursor:pointer" onclick="IntercomPage.selectSystem('${s.id}');HippoApp.navigate('intercom')">
-                    <div style="display:flex;align-items:center;gap:6px">
-                        <div style="width:6px;height:6px;border-radius:50%;background:${dot};flex-shrink:0"></div>
-                        <div style="flex:1;min-width:0">
-                            <div style="font-weight:600;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${UI.esc(s.name)}</div>
-                            <div style="font-size:9px;color:var(--text-muted)">Riedel ${UI.esc(s.model)}</div>
-                        </div>
-                        <button class="server-card-remove" onclick="event.stopPropagation();IntercomPage.removeSystem('${s.id}')" title="Remove">
-                            <i class="fas fa-times"></i>
-                        </button>
+                <div class="sidebar-device-card" onclick="IntercomPage.selectSystem('${s.id}');HippoApp.navigate('intercom')">
+                    <span class="device-dot" style="background:${dot}"></span>
+                    <div class="device-info">
+                        <div class="device-name">${UI.esc(s.name)}</div>
+                        <div class="device-sub">Riedel ${UI.esc(s.model)}</div>
                     </div>
+                    <button class="device-remove" onclick="event.stopPropagation();IntercomPage.removeSystem('${s.id}')" title="Remove">
+                        <i class="fas fa-times"></i>
+                    </button>
                 </div>`;
         }).join('');
     },
@@ -825,23 +827,34 @@ const IntercomPage = {
     },
 
     _startPolling() {
-        this._stopPolling();
-        this._pollTimer = setInterval(() => this._pollAll(), this._pollInterval);
+        if (!this._pollTimer) {
+            this._pollTimer = setInterval(() => this._pollAll(), this._pollInterval);
+        }
     },
 
     _stopPolling() {
         if (this._pollTimer) { clearInterval(this._pollTimer); this._pollTimer = null; }
     },
 
+    _pollCount: 0,
+
     async _pollAll() {
+        this._pollCount++;
         for (const sys of this._systems) {
-            if (!sys.virtual) await this._checkConnection(sys);
+            if (sys.virtual) continue;
+            await this._checkConnection(sys);
+            // Full data refresh every 5th poll for the selected system
+            if (sys.connected && sys.id === this._selectedId && this._pollCount % 5 === 0) {
+                await this.refreshSystem(sys.id);
+            }
         }
     },
 
     _updateList() {
-        const list = document.getElementById('ic-system-list');
-        if (list) list.innerHTML = this._renderSystemList();
+        if (this._isActive) {
+            const list = document.getElementById('ic-system-list');
+            if (list) list.innerHTML = this._renderSystemList();
+        }
         this.renderSidebarList();
     },
 
@@ -855,13 +868,22 @@ const IntercomPage = {
     },
 
     onActivate() {
+        this._isActive = true;
         this._loadSystems();
         this._initVirtualDemo();
         this._startPolling();
         this.renderSidebarList();
+        // Immediately fetch full data for the selected system
+        const sys = this._getSelected();
+        if (sys && !sys.virtual) {
+            this._checkConnection(sys).then(() => {
+                if (sys.connected) this.refreshSystem(sys.id);
+            });
+        }
     },
 
     onDeactivate() {
-        this._stopPolling();
+        this._isActive = false;
+        // Timer keeps running in background
     },
 };

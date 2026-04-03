@@ -34,6 +34,17 @@ const HippoApp = {
         fixtures:     FixturesPage,
         truckpack:    TruckPackPage,
         captureview:  CaptureViewPage,
+        nethealth:    NetHealthPage,
+        ipam:         IpamPage,
+        dante:        DantePage,
+        timecodegen:  TimecodeGenPage,
+        oscrouter:    OscRouterPage,
+        macrobuilder: MacroBuilderPage,
+        ndidiscovery: NdiDiscoveryPage,
+        riggingcalc:  RiggingCalcPage,
+        weighttracker: WeightTrackerPage,
+        sacnmonitor:  SacnMonitorPage,
+        showclock:    ShowClockPage,
         specifications: SpecificationsPage,
         settings:     SettingsPage,
         logs:         LogsPage,
@@ -52,7 +63,16 @@ const HippoApp = {
     init() {
         // No auto-seeding — user adds servers manually via Add Server dialog
 
+        // Restore saved theme
+        const savedTheme = localStorage.getItem('luxor_theme');
+        if (savedTheme === 'light') {
+            document.documentElement.dataset.theme = 'light';
+            const icon = document.querySelector('#theme-toggle i');
+            if (icon) { icon.className = 'fas fa-sun'; }
+        }
+
         this.populateServerSelect();
+        this.setupDock();
         this.setupNavigation();
         this.setupWebSocketListeners();
         this.setupKeyboardShortcuts();
@@ -82,12 +102,76 @@ const HippoApp = {
         // Hide nav until a server is connected
         this.updateNavVisibility(null);
 
-        appState.log('INFO', 'Luxor Production v1.3 started', 'System');
+        appState.log('INFO', 'Luxor Production v1.4 started', 'System');
     },
 
     // ================================================================
-    // NAVIGATION
+    // DOCK + PANEL NAVIGATION
     // ================================================================
+    _categoryTitles: {
+        control: 'Engine Control', devices: 'Devices', led: 'LED Tools', tools: 'Tools',
+        network: 'Network', production: 'Production', '3d': '3D Tools', system: 'System'
+    },
+
+    // Map page IDs to their category for auto-switching
+    _pageToCategory: {
+        showrun: 'devices', dashboard: 'devices', status: 'devices', composition: 'control',
+        timelines: 'control', media: 'control', mixes: 'control', presets: 'control',
+        pins: 'control', timecode: 'control',
+        ledprocessor: 'devices', ptz: 'devices', netswitch: 'devices', lighting: 'devices', intercom: 'devices',
+        ledcalc: 'led', ledsetup: 'led', pixlgrid: 'led', ledconnect: 'led',
+        timecodegen: 'tools', showclock: 'tools', macrobuilder: 'tools', oscrouter: 'tools',
+        nethealth: 'network', ipam: 'network', dante: 'network', ndidiscovery: 'network',
+        sacnmonitor: 'network', network: 'network', dmx: 'network', sync: 'network',
+        diagram: 'production', truckpack: 'production', specifications: 'production',
+        riggingcalc: 'production', weighttracker: 'production', power: 'production',
+        fixtures: 'production', captureview: 'production',
+        stage3d: 'production', ledpanel3d: 'production',
+        settings: 'system', logs: 'logs',
+    },
+
+    _activeCategory: 'devices',
+
+    setupDock() {
+        document.querySelectorAll('#sidebar-dock .dock-icon[data-category]').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const cat = btn.dataset.category;
+                HippoApp.switchCategory(cat);
+            });
+        });
+    },
+
+    switchCategory(cat) {
+        if (!cat) return;
+        this._activeCategory = cat;
+
+        // Update dock icon active states
+        document.querySelectorAll('#sidebar-dock .dock-icon[data-category]').forEach(b => {
+            b.classList.toggle('active', b.dataset.category === cat);
+        });
+
+        // Update panel title
+        const title = document.getElementById('panel-title');
+        if (title) title.textContent = this._categoryTitles[cat] || cat;
+
+        // Show matching category panel
+        document.querySelectorAll('.panel-category').forEach(p => {
+            p.classList.toggle('active', p.dataset.cat === cat);
+        });
+
+        // Open panel if collapsed
+        const panel = document.getElementById('sidebar-panel');
+        if (panel && panel.classList.contains('collapsed')) {
+            panel.classList.remove('collapsed');
+        }
+    },
+
+    togglePanel() {
+        const panel = document.getElementById('sidebar-panel');
+        if (panel) panel.classList.toggle('collapsed');
+    },
+
     setupNavigation() {
         document.querySelectorAll('.nav-item').forEach(link => {
             link.addEventListener('click', (e) => {
@@ -113,6 +197,12 @@ const HippoApp = {
         appState.set('currentPage', page);
         location.hash = page;
 
+        // Auto-switch dock category to match the page
+        const cat = this._pageToCategory[page];
+        if (cat && cat !== this._activeCategory) {
+            this.switchCategory(cat);
+        }
+
         // Update nav
         document.querySelectorAll('.nav-item').forEach(l => l.classList.toggle('active', l.dataset.page === page));
 
@@ -123,6 +213,16 @@ const HippoApp = {
             media: 'Media Library', mixes: 'Mixes & Layers', presets: 'Presets',
             pins: 'Pin Control', ledprocessor: 'LED Processor', network: 'Network Config', dmx: 'DMX / Art-Net',
             sync: 'Sync & Cluster', lighting: 'Lighting Console', intercom: 'Intercom', settings: 'Settings', logs: 'Event Log',
+            ledcalc: 'LED Calculator', ledsetup: 'LED Setup Calc', pixlgrid: 'PIXL Grid', ledconnect: 'LED Auto-Connect',
+            ptz: 'PTZ Cameras', netswitch: 'Network Switches',
+            nethealth: 'Network Health', ipam: 'IP Manager', dante: 'Dante / AES67',
+            timecodegen: 'Timecode Generator', showclock: 'Show Clock',
+            macrobuilder: 'Macro Builder', oscrouter: 'OSC Router',
+            ndidiscovery: 'NDI Discovery', sacnmonitor: 'sACN / Art-Net Monitor',
+            diagram: 'Diagram Builder', truckpack: 'Truck Packer', specifications: 'Specifications',
+            riggingcalc: 'Rigging Calculator', weighttracker: 'Weight Tracker',
+            power: 'Power Distribution', fixtures: 'Fixture Patch', captureview: 'Capture Viewer',
+            stage3d: '3D Stage Visualizer', ledpanel3d: '3D LED Layout',
         };
         document.getElementById('page-title').textContent = titles[page] || page;
 
@@ -171,28 +271,25 @@ const HippoApp = {
         const connected = appState.get('connected');
 
         if (servers.length === 0) {
-            container.innerHTML = `<div style="font-size:10px;color:var(--text-muted);padding:4px 0;">No servers added</div>`;
+            container.innerHTML = '';
             return;
         }
 
+        const statuses = appState.get('serverStatuses') || {};
         container.innerHTML = servers.map(s => {
             const t = this._serverTypes[s.type] || this._serverTypes['hippo'];
             const isActive = s.id === activeId;
             const isOnline = isActive && connected;
-            const borderColor = isActive ? t.color : 'var(--border)';
+            const wasOnline = statuses[s.id]?.online;
+            const dotColor = isOnline ? '#4ade80' : isActive ? '#f59e0b' : wasOnline ? '#4ade80' : '#6b7280';
             return `
-            <div style="display:flex;align-items:center;gap:6px;padding:5px 8px;background:${isActive ? 'rgba(' + t.rgb + ',0.08)' : 'var(--bg-tertiary)'};border-radius:6px;border:1px solid ${borderColor};cursor:pointer;"
-                 onclick="HippoApp.switchServer('${s.id}')" title="${isActive ? 'Connected' : 'Click to connect'}">
-                <span style="width:6px;height:6px;border-radius:50%;background:${isOnline ? '#4ade80' : isActive ? '#f59e0b' : '#6b7280'};flex-shrink:0;"></span>
-                <div style="flex:1;min-width:0;">
-                    <div style="font-size:10px;font-weight:700;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
-                        ${UI.esc(s.name)}
-                    </div>
-                    <div style="font-size:8px;color:var(--text-muted);">
-                        ${t.label} ${s.virtual ? '(Demo)' : s.host ? '— ' + s.host : ''}
-                    </div>
+            <div class="sidebar-device-card ${isActive ? 'selected' : ''}" onclick="HippoApp.switchServer('${s.id}')" title="${isActive ? 'Connected' : 'Click to connect'}">
+                <span class="device-dot" style="background:${dotColor}"></span>
+                <div class="device-info">
+                    <div class="device-name">${UI.esc(s.name)}</div>
+                    <div class="device-sub">${t.label} ${s.virtual ? '(Demo)' : s.host ? '— ' + s.host : ''}</div>
                 </div>
-                <button onclick="event.stopPropagation();HippoApp.removeServer('${s.id}')" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:10px;padding:2px;" title="Remove">
+                <button class="device-remove" onclick="event.stopPropagation();HippoApp.removeServer('${s.id}')" title="Remove">
                     <i class="fas fa-times"></i>
                 </button>
             </div>`;
@@ -776,13 +873,9 @@ const HippoApp = {
     // NAV VISIBILITY — show/hide pages based on server type
     // ================================================================
     // Pages that are always visible (even when disconnected)
-    _alwaysVisiblePages: ['settings', 'logs', 'status', 'ledprocessor', 'ledcalc', 'ledsetup', 'pixlgrid', 'diagram', 'ledconnect', 'ptz', 'netswitch', 'lighting', 'intercom', 'stage3d', 'ledpanel3d', 'power', 'fixtures', 'truckpack', 'captureview', 'specifications'],
+    _alwaysVisiblePages: ['showrun', 'dashboard', 'settings', 'logs', 'status', 'ledprocessor', 'ledcalc', 'ledsetup', 'pixlgrid', 'diagram', 'ledconnect', 'ptz', 'netswitch', 'lighting', 'intercom', 'stage3d', 'ledpanel3d', 'power', 'fixtures', 'truckpack', 'captureview', 'nethealth', 'ipam', 'dante', 'timecodegen', 'specifications', 'oscrouter', 'macrobuilder', 'ndidiscovery', 'riggingcalc', 'weighttracker', 'sacnmonitor', 'showclock'],
 
     updateNavVisibility(serverType) {
-        const nav = document.getElementById('sidebar-nav');
-        if (!nav) return;
-        nav.style.display = '';
-
         document.querySelectorAll('.nav-item').forEach(item => {
             const page = item.dataset.page;
             if (!page) return;
@@ -809,19 +902,8 @@ const HippoApp = {
             }
         });
 
-        // Hide section labels if all their items are hidden
-        document.querySelectorAll('.nav-section-label').forEach(label => {
-            let next = label.nextElementSibling;
-            let anyVisible = false;
-            while (next && !next.classList.contains('nav-section-label')) {
-                if (next.classList.contains('nav-item') && next.style.display !== 'none') {
-                    anyVisible = true;
-                    break;
-                }
-                next = next.nextElementSibling;
-            }
-            label.style.display = anyVisible ? '' : 'none';
-        });
+        // Re-apply optional feature visibility (3D tools, capture viewer, power, fixtures)
+        this.applySidebarVisibility();
     },
 
     // ================================================================
@@ -881,11 +963,24 @@ const HippoApp = {
     // ================================================================
     // SIDEBAR
     // ================================================================
+    toggleTheme() {
+        const current = document.documentElement.dataset.theme;
+        const newTheme = current === 'light' ? 'dark' : 'light';
+        if (newTheme === 'light') {
+            document.documentElement.dataset.theme = 'light';
+        } else {
+            delete document.documentElement.dataset.theme;
+        }
+        localStorage.setItem('luxor_theme', newTheme);
+        const icon = document.querySelector('#theme-toggle i');
+        if (icon) {
+            icon.className = newTheme === 'light' ? 'fas fa-sun' : 'fas fa-moon';
+        }
+    },
+
     toggleSidebar() {
-        const sidebar = document.getElementById('sidebar');
-        sidebar.classList.toggle('collapsed');
-        sidebar.classList.toggle('mobile-open');
-        appState.set('sidebarCollapsed', sidebar.classList.contains('collapsed'));
+        // Toggle the panel visibility (dock stays visible)
+        this.togglePanel();
     },
 
     // ================================================================
@@ -1498,12 +1593,16 @@ const HippoApp = {
                 switches: saved.switches !== false,
                 consoles: saved.consoles !== false,
                 intercom: saved.intercom !== false,
-                tools3d: saved.tools3d === true,           // disabled by default
-                captureViewer: saved.captureViewer === true, // disabled by default
+                tools3d: saved.tools3d === true,
+                captureViewer: saved.captureViewer === true,
+                power: saved.power === true,
+                fixtures: saved.fixtures === true,
             };
         } catch {
-            vis = { engines: true, ledProcessors: true, cameras: true, switches: true, consoles: true, intercom: true, tools3d: false, captureViewer: false };
+            vis = { engines: true, ledProcessors: true, cameras: true, switches: true, consoles: true, intercom: true, tools3d: false, captureViewer: false, power: false, fixtures: false };
         }
+
+        // Hide/show device sections in the Devices panel
         const map = {
             engines: 'server-selector',
             ledProcessors: 'led-processor-selector',
@@ -1517,10 +1616,12 @@ const HippoApp = {
             if (el) el.style.display = vis[key] ? '' : 'none';
         }
 
-        // Hide/show 3D Tools and Capture Viewer nav items based on settings
+        // Hide/show optional feature nav items + dock icons
         const hiddenPages = [];
         if (!vis.tools3d) hiddenPages.push('stage3d', 'ledpanel3d');
         if (!vis.captureViewer) hiddenPages.push('captureview');
+        if (!vis.power) hiddenPages.push('power');
+        if (!vis.fixtures) hiddenPages.push('fixtures');
         document.querySelectorAll('.nav-item').forEach(item => {
             const page = item.dataset.page;
             if (hiddenPages.includes(page)) {
@@ -1528,23 +1629,6 @@ const HippoApp = {
             }
         });
 
-        // Apply sidebar section ordering
-        try {
-            const defaultOrder = ['engines', 'ledProcessors', 'cameras', 'switches', 'consoles', 'intercom'];
-            const savedOrder = JSON.parse(localStorage.getItem('luxor_sidebar_order') || '[]');
-            const order = (Array.isArray(savedOrder) && savedOrder.length === defaultOrder.length) ? savedOrder : defaultOrder;
-            const sidebar = document.getElementById('sidebar');
-            if (sidebar) {
-                // Get the nav element as anchor point — sections go before it
-                const nav = document.getElementById('sidebar-nav');
-                if (nav) {
-                    order.forEach(key => {
-                        const el = document.getElementById(map[key]);
-                        if (el) sidebar.insertBefore(el, nav);
-                    });
-                }
-            }
-        } catch {}
     },
 
     showAddLedProcessor() {
@@ -1605,23 +1689,18 @@ const HippoApp = {
         }
 
         if (procs.length === 0) {
-            container.innerHTML = `<div style="font-size:10px;color:var(--text-muted);padding:4px 0;">No processors added</div>`;
+            container.innerHTML = '';
             return;
         }
 
         container.innerHTML = procs.map(p => `
-            <div style="display:flex;align-items:center;gap:6px;padding:5px 8px;background:var(--bg-tertiary);border-radius:6px;border:1px solid var(--border);cursor:pointer;"
-                 onclick="HippoApp.selectLedProcessor('${p.id}')" title="Click to open ${UI.esc(p.name)}">
-                <span style="width:6px;height:6px;border-radius:50%;background:${p.online ? '#4ade80' : '#ef4444'};flex-shrink:0;"></span>
-                <div style="flex:1;min-width:0;">
-                    <div style="font-size:10px;font-weight:700;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
-                        ${UI.esc(p.name)}
-                    </div>
-                    <div style="font-size:8px;color:var(--text-muted);">
-                        ${p.type} ${p.host && p.host !== 'virtual-led' ? '— ' + p.host : ''}${p.virtual ? ' (Demo)' : ''}
-                    </div>
+            <div class="sidebar-device-card" onclick="HippoApp.selectLedProcessor('${p.id}')" title="Click to open ${UI.esc(p.name)}">
+                <span class="device-dot" style="background:${p.online ? '#4ade80' : '#ef4444'}"></span>
+                <div class="device-info">
+                    <div class="device-name">${UI.esc(p.name)}</div>
+                    <div class="device-sub">${p.type} ${p.host && p.host !== 'virtual-led' ? '— ' + p.host : ''}${p.virtual ? ' (Demo)' : ''}</div>
                 </div>
-                <button onclick="event.stopPropagation();HippoApp.removeLedProcessor('${p.id}')" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:10px;padding:2px;" title="Remove">
+                <button class="device-remove" onclick="event.stopPropagation();HippoApp.removeLedProcessor('${p.id}')" title="Remove">
                     <i class="fas fa-times"></i>
                 </button>
             </div>

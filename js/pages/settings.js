@@ -488,11 +488,15 @@ const SettingsPage = {
     _featureLabels: {
         tools3d: '3D Tools (Stage Visualizer & LED Layout)',
         captureViewer: 'Capture Viewer (.c2p import)',
+        power: 'Power Distribution',
+        fixtures: 'Fixture Patch View',
     },
 
     _featureIcons: {
         tools3d: 'fa-cube',
         captureViewer: 'fa-eye',
+        power: 'fa-bolt',
+        fixtures: 'fa-lightbulb',
     },
 
     _displaySection() {
@@ -531,7 +535,7 @@ const SettingsPage = {
                 <div class="card-header"><h3><i class="fas fa-flask"></i> Optional Features</h3></div>
                 <div class="card-body">
                     <p class="text-muted" style="font-size:11px;margin-bottom:12px">Enable or disable experimental features. These are hidden by default.</p>
-                    ${['tools3d', 'captureViewer'].map(key => `
+                    ${['tools3d', 'captureViewer', 'power', 'fixtures'].map(key => `
                         <div class="form-inline mb-md" style="display:flex;align-items:center;gap:8px;padding:6px 8px;background:var(--bg-secondary);border-radius:var(--radius-sm);border:1px solid var(--border)">
                             <i class="fas ${this._featureIcons[key] || 'fa-circle'}" style="font-size:12px;color:var(--text-muted);width:16px;text-align:center"></i>
                             <span style="font-size:12px;flex:1">${this._featureLabels[key] || key}</span>
@@ -564,9 +568,11 @@ const SettingsPage = {
                 intercom: saved.intercom !== false,
                 tools3d: saved.tools3d === true,
                 captureViewer: saved.captureViewer === true,
+                power: saved.power === true,
+                fixtures: saved.fixtures === true,
             };
         } catch {
-            return { engines: true, ledProcessors: true, cameras: true, switches: true, consoles: true, intercom: true, tools3d: false, captureViewer: false };
+            return { engines: true, ledProcessors: true, cameras: true, switches: true, consoles: true, intercom: true, tools3d: false, captureViewer: false, power: false, fixtures: false };
         }
     },
 

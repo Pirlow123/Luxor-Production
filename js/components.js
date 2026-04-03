@@ -2,14 +2,23 @@
  * Luxor Production - Shared UI Components
  */
 const UI = {
+    _MAX_TOASTS: 3,
+
     toast(message, type = 'info', duration = 4000) {
         const container = document.getElementById('toast-container');
+        if (!container) return;
         const icons = { success: 'fa-check-circle', error: 'fa-times-circle', warning: 'fa-exclamation-triangle', info: 'fa-info-circle' };
+
+        // Limit visible toasts — remove oldest when at max
+        while (container.children.length >= this._MAX_TOASTS) {
+            container.removeChild(container.firstChild);
+        }
+
         const el = document.createElement('div');
         el.className = `toast ${type}`;
         el.innerHTML = `<i class="fas ${icons[type]} toast-icon"></i><span class="toast-message">${this.esc(message)}</span><button class="toast-close" onclick="this.parentElement.remove()">&times;</button>`;
         container.appendChild(el);
-        setTimeout(() => { el.style.opacity = '0'; el.style.transform = 'translateX(100%)'; el.style.transition = '0.2s'; setTimeout(() => el.remove(), 200); }, duration);
+        setTimeout(() => { if (el.parentNode) { el.style.opacity = '0'; el.style.transform = 'translateX(100%)'; el.style.transition = '0.2s'; setTimeout(() => el.remove(), 200); } }, duration);
     },
 
     openModal(title, body, footer = '') {

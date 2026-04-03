@@ -7,6 +7,7 @@ const PtzPage = {
     // ---- Camera Database ----
     _cameras: [], // { id, name, type: 'panasonic'|'birddog', ip, port, model, connected, tally: 'off'|'red'|'green', lastSeen }
     _selectedId: null,
+    _isActive: false,
     _pollTimer: null,
     _pollInterval: 2000,
     _ptzInterval: null, // For continuous PTZ movement
@@ -548,7 +549,7 @@ const PtzPage = {
                 <td class="text-muted">${label}</td>
                 <td>
                     <div class="flex gap-xs" style="align-items:center">
-                        <input type="range" id="${id}" min="${min}" max="${max}" value="${def}" oninput="${onchange};document.getElementById('${id}-val').textContent=this.value" style="flex:1">
+                        <input type="range" id="${id}" min="${min}" max="${max}" value="${def}" oninput="document.getElementById('${id}-val').textContent=this.value;${onchange}" style="flex:1">
                         <span id="${id}-val" style="font-size:11px;min-width:30px;text-align:right">${def}</span>
                     </div>
                 </td>
@@ -663,11 +664,14 @@ const PtzPage = {
              <button class="btn btn-danger" onclick="PtzPage._confirmRemoveCamera('${id}')">Remove</button>`);
     },
 
-    selectCamera(id) {
+    async selectCamera(id) {
         this._selectedId = id;
         this._refreshAll();
         const cam = this._getSelected();
-        if (cam) this._checkConnection(cam);
+        if (cam && !cam.virtual) {
+            await this._checkConnection(cam);
+            if (cam.connected) await this._pollPosition(cam);
+        }
     },
 
     _getSelected() {
@@ -687,7 +691,7 @@ const PtzPage = {
             const d = JSON.parse(localStorage.getItem('luxor_ptz_cameras') || '[]');
             this._cameras = d.map(c => ({ ...c, connected: false, tally: 'off', lastSeen: null }));
             const virt = JSON.parse(localStorage.getItem('luxor_ptz_cameras_virtual') || '[]');
-            virt.forEach(v => { if (!this._cameras.find(c => c.id === v.id)) this._cameras.push(v); });
+            virt.forEach(v => { if (!this._cameras.find(c => c.id === v.id)) this._cameras.push({ ...v, connected: true }); });
             if (this._cameras.length > 0 && !this._selectedId) this._selectedId = this._cameras[0].id;
         } catch { this._cameras = []; }
     },
@@ -748,9 +752,11 @@ const PtzPage = {
     },
 
     _updateCamDot(cam) {
-        // Update both main page list AND sidebar list
-        const list = document.getElementById('ptz-cam-list');
-        if (list) list.innerHTML = this._renderCameraList();
+        // Always update sidebar; only update main list when page is active
+        if (this._isActive) {
+            const list = document.getElementById('ptz-cam-list');
+            if (list) list.innerHTML = this._renderCameraList();
+        }
         this.renderSidebarList();
     },
 
@@ -1111,8 +1117,9 @@ const PtzPage = {
     // POLLING
     // ============================================================
     _startPolling() {
-        this._stopPolling();
-        this._pollTimer = setInterval(() => this._pollAll(), this._pollInterval);
+        if (!this._pollTimer) {
+            this._pollTimer = setInterval(() => this._pollAll(), this._pollInterval);
+        }
     },
 
     _stopPolling() {
@@ -1156,7 +1163,7 @@ const PtzPage = {
                 if (fm) cam._focusPos = parseInt(fm[1], 16);
             }
             // Update position display
-            this._updatePositionDisplay(cam);
+            if (this._isActive) this._updatePositionDisplay(cam);
         }
     },
 
@@ -1190,25 +1197,22 @@ const PtzPage = {
         const container = document.getElementById('ptz-camera-list');
         if (!container) return;
         if (this._cameras.length === 0) {
-            container.innerHTML = '<div style="font-size:10px;color:var(--text-muted);text-align:center;padding:4px">No cameras</div>';
+            container.innerHTML = '';
             return;
         }
         container.innerHTML = this._cameras.map(c => {
-            const dot = c.connected ? 'var(--green)' : 'var(--red)';
-            const tallyBg = c.tally === 'red' ? 'rgba(231,76,60,0.15)' : c.tally === 'green' ? 'rgba(46,204,113,0.15)' : '';
+            const dot = c.connected ? '#4ade80' : '#ef4444';
             const brand = c.type === 'panasonic' ? 'Panasonic' : 'BirdDog';
             return `
-                <div class="server-card" style="cursor:pointer;${tallyBg ? 'background:' + tallyBg : ''}" onclick="PtzPage.selectCamera('${c.id}');HippoApp.navigate('ptz')">
-                    <div style="display:flex;align-items:center;gap:6px">
-                        <div style="width:6px;height:6px;border-radius:50%;background:${dot};flex-shrink:0"></div>
-                        <div style="flex:1;min-width:0">
-                            <div style="font-weight:600;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${UI.esc(c.name)}</div>
-                            <div style="font-size:9px;color:var(--text-muted)">${brand} ${UI.esc(c.model)}</div>
-                        </div>
-                        <button class="server-card-remove" onclick="event.stopPropagation();PtzPage.removeCamera('${c.id}')" title="Remove">
-                            <i class="fas fa-times"></i>
-                        </button>
+                <div class="sidebar-device-card" onclick="PtzPage.selectCamera('${c.id}');HippoApp.navigate('ptz')">
+                    <span class="device-dot" style="background:${dot}"></span>
+                    <div class="device-info">
+                        <div class="device-name">${UI.esc(c.name)}</div>
+                        <div class="device-sub">${brand} ${UI.esc(c.model)}</div>
                     </div>
+                    <button class="device-remove" onclick="event.stopPropagation();PtzPage.removeCamera('${c.id}')" title="Remove">
+                        <i class="fas fa-times"></i>
+                    </button>
                 </div>`;
         }).join('');
     },
@@ -1253,9 +1257,17 @@ const PtzPage = {
     },
 
     onActivate() {
+        this._isActive = true;
         this._loadCameras();
         this._startPolling();
         this.renderSidebarList();
+        // Immediately fetch position for the selected camera
+        const cam = this._getSelected();
+        if (cam && !cam.virtual) {
+            this._checkConnection(cam).then(() => {
+                if (cam.connected) this._pollPosition(cam);
+            });
+        }
     },
 
     _initVirtualDemo() {
@@ -1263,7 +1275,8 @@ const PtzPage = {
     },
 
     onDeactivate() {
-        this._stopPolling();
+        this._isActive = false;
+        // Timer keeps running in background
         this._stopMove();
         this._stopZoom();
     },
