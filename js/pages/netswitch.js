@@ -13,7 +13,7 @@ const NetSwitchPage = {
     // Device models
     _models: {
         gigacore: ['GigaCore 10', 'GigaCore 12', 'GigaCore 14R', 'GigaCore 16t', 'GigaCore 16Xt', 'GigaCore 16RFO', 'GigaCore 26i', 'GigaCore 30i'],
-        luminode: ['LumiNode 1', 'LumiNode 2', 'LumiNode 4', 'LumiNode 12'],
+        luminode: ['LumiNode 1', 'LumiNode 2', 'LumiNode 4', 'LumiNode 12', 'LumiNode MX40'],
         cameo: ['XNode 4', 'XNode 8'],
     },
 
@@ -100,6 +100,7 @@ const NetSwitchPage = {
         <div class="section-header">
             <h2><i class="fas fa-network-wired"></i> Network Switches</h2>
             <div class="flex gap-sm">
+                <button class="btn btn-sm" onclick="NetSwitchPage._reconnectAll()" title="Reconnect all switches"><i class="fas fa-sync-alt"></i> Reconnect</button>
                 <button class="btn btn-sm btn-primary" onclick="NetSwitchPage.showAddSwitch()"><i class="fas fa-plus"></i> Add Switch</button>
             </div>
         </div>
@@ -673,7 +674,7 @@ const NetSwitchPage = {
         if (body?.id) { path = path.replace('{id}', body.id); delete body.id; }
         const url = `${this._api.baseUrl(sw.ip)}${path}`;
         try {
-            const opts = { method: ep.method, signal: AbortSignal.timeout(3000) };
+            const opts = { method: ep.method, signal: AbortSignal.timeout(5000) };
             if (body && (ep.method === 'POST' || ep.method === 'PUT')) {
                 opts.headers = { 'Content-Type': 'application/json' };
                 opts.body = JSON.stringify(body);
@@ -684,6 +685,17 @@ const NetSwitchPage = {
             sw.lastSeen = Date.now();
             try { return JSON.parse(text); } catch { return text; }
         } catch (e) {
+            // Fallback: try root URL to check if device is reachable at all
+            if (section === 'system' && endpoint === 'info') {
+                try {
+                    const fallback = await fetch(`http://${sw.ip}/`, { signal: AbortSignal.timeout(5000) });
+                    if (fallback.ok || fallback.status < 500) {
+                        sw.connected = true;
+                        sw.lastSeen = Date.now();
+                        return { model: sw.model, firmware: 'N/A (web only)' };
+                    }
+                } catch {}
+            }
             sw.connected = false;
             return null;
         }
@@ -1012,6 +1024,22 @@ const NetSwitchPage = {
     },
 
     // ============================================================
+    // RECONNECT
+    // ============================================================
+    async _reconnectAll() {
+        UI.toast('Reconnecting all switches...', 'info');
+        for (const sw of this._switches) {
+            if (!sw.virtual) await this._checkConnection(sw);
+        }
+        // Full refresh for selected switch
+        const sel = this._getSelected();
+        if (sel && sel.connected) await this.refreshSwitch(sel.id);
+        this._refreshAll();
+        const online = this._switches.filter(s => s.connected).length;
+        UI.toast(`${online}/${this._switches.length} switches connected`, online > 0 ? 'success' : 'error');
+    },
+
+    // ============================================================
     // POLLING / LIFECYCLE
     // ============================================================
     _startPolling() {
@@ -1023,9 +1051,17 @@ const NetSwitchPage = {
         if (this._pollTimer) { clearInterval(this._pollTimer); this._pollTimer = null; }
     },
 
+    _pollCount: 0,
+
     async _pollAll() {
+        this._pollCount++;
         for (const sw of this._switches) {
+            if (sw.virtual) continue;
             await this._checkConnection(sw);
+            // Full data refresh every 5th poll (~15s) for the selected switch
+            if (sw.connected && sw.id === this._selectedId && this._pollCount % 5 === 0) {
+                await this.refreshSwitch(sw.id);
+            }
         }
     },
 

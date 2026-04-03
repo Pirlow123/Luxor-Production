@@ -85,6 +85,7 @@ const IntercomPage = {
         <div class="section-header">
             <h2><i class="fas fa-headset"></i> Intercom Systems</h2>
             <div class="flex gap-sm">
+                <button class="btn btn-sm" onclick="IntercomPage._reconnectAll()" title="Reconnect all systems"><i class="fas fa-sync-alt"></i> Reconnect</button>
                 <button class="btn btn-sm btn-primary" onclick="IntercomPage.showAddSystem()"><i class="fas fa-plus"></i> Add System</button>
             </div>
         </div>
@@ -813,6 +814,16 @@ const IntercomPage = {
     // ============================================================
     // POLLING / LIFECYCLE
     // ============================================================
+    async _reconnectAll() {
+        UI.toast('Reconnecting all intercom systems...', 'info');
+        for (const sys of this._systems) {
+            if (!sys.virtual) await this._checkConnection(sys);
+        }
+        this._refreshAll();
+        const online = this._systems.filter(s => s.connected).length;
+        UI.toast(`${online}/${this._systems.length} systems connected`, online > 0 ? 'success' : 'error');
+    },
+
     _startPolling() {
         this._stopPolling();
         this._pollTimer = setInterval(() => this._pollAll(), this._pollInterval);

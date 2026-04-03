@@ -485,6 +485,16 @@ const SettingsPage = {
         intercom: 'fa-headset',
     },
 
+    _featureLabels: {
+        tools3d: '3D Tools (Stage Visualizer & LED Layout)',
+        captureViewer: 'Capture Viewer (.c2p import)',
+    },
+
+    _featureIcons: {
+        tools3d: 'fa-cube',
+        captureViewer: 'fa-eye',
+    },
+
     _displaySection() {
         const vis = SettingsPage._getSidebarVisibility();
         const order = SettingsPage._getSidebarOrder();
@@ -516,7 +526,30 @@ const SettingsPage = {
                     `).join('')}
                 </div>
             </div>
+
+            <div class="card mt-md">
+                <div class="card-header"><h3><i class="fas fa-flask"></i> Optional Features</h3></div>
+                <div class="card-body">
+                    <p class="text-muted" style="font-size:11px;margin-bottom:12px">Enable or disable experimental features. These are hidden by default.</p>
+                    ${['tools3d', 'captureViewer'].map(key => `
+                        <div class="form-inline mb-md" style="display:flex;align-items:center;gap:8px;padding:6px 8px;background:var(--bg-secondary);border-radius:var(--radius-sm);border:1px solid var(--border)">
+                            <i class="fas ${this._featureIcons[key] || 'fa-circle'}" style="font-size:12px;color:var(--text-muted);width:16px;text-align:center"></i>
+                            <span style="font-size:12px;flex:1">${this._featureLabels[key] || key}</span>
+                            ${UI.toggle('feat-' + key, vis[key], "SettingsPage._toggleFeature('" + key + "')")}
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
         `;
+    },
+
+    _toggleFeature(key) {
+        const vis = this._getSidebarVisibility();
+        vis[key] = !vis[key];
+        try { localStorage.setItem('luxor_sidebar_visibility', JSON.stringify(vis)); } catch {}
+        HippoApp.applySidebarVisibility();
+        const el = document.getElementById('settings-content');
+        if (el) el.innerHTML = this._renderSection();
     },
 
     _getSidebarVisibility() {
@@ -529,9 +562,11 @@ const SettingsPage = {
                 switches: saved.switches !== false,
                 consoles: saved.consoles !== false,
                 intercom: saved.intercom !== false,
+                tools3d: saved.tools3d === true,
+                captureViewer: saved.captureViewer === true,
             };
         } catch {
-            return { engines: true, ledProcessors: true, cameras: true, switches: true, consoles: true, intercom: true };
+            return { engines: true, ledProcessors: true, cameras: true, switches: true, consoles: true, intercom: true, tools3d: false, captureViewer: false };
         }
     },
 

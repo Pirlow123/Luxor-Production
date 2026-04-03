@@ -65,6 +65,7 @@ const LedProcessorPage = {
                         ${this._processors.map(p => `<option value="${p.id}" ${this._activeProc?.id === p.id ? 'selected' : ''}>${p.virtual ? '\u{1F9EA} ' : ''}${UI.esc(p.name)} (${p.type})</option>`).join('')}
                     </select>
                     <button class="btn btn-xs btn-primary" onclick="LedProcessorPage.showAddProcessor()"><i class="fas fa-plus"></i> Add</button>
+                    ${this._activeProc ? `<button class="btn btn-xs" onclick="LedProcessorPage._reconnect()" title="Reconnect"><i class="fas fa-sync-alt"></i> Reconnect</button>` : ''}
                     ${this._activeProc ? `<button class="btn btn-xs btn-danger" onclick="LedProcessorPage.confirmRemoveProcessor()"><i class="fas fa-trash"></i> Remove</button>` : ''}
                 </div>
                 <div class="led-toolbar-right">
@@ -1152,15 +1153,78 @@ const LedProcessorPage = {
 
     async _fetchStatus() {
         if (!this._activeProc || this._activeProc.virtual) return;
+        const base = `http://${this._activeProc.host}:${this._activeProc.port}/api/v1`;
+        const wasOnline = this._status.online;
         try {
-            const resp = await fetch(`http://${this._activeProc.host}:${this._activeProc.port}/api/v1/device/hw`, { signal: AbortSignal.timeout(3000) });
-            if (resp.ok) {
-                const data = await resp.json();
-                this._status = { online: true, firmware: data.firmware || '--', ...this._status };
+            // Fetch hardware info + brightness + input source in parallel
+            const [hwResp, brightResp, inputResp, tempResp] = await Promise.allSettled([
+                fetch(`${base}/device/hw`, { signal: AbortSignal.timeout(3000) }),
+                fetch(`${base}/device/brightness`, { signal: AbortSignal.timeout(3000) }),
+                fetch(`${base}/device/input/source`, { signal: AbortSignal.timeout(3000) }),
+                fetch(`${base}/device/temperature`, { signal: AbortSignal.timeout(3000) }),
+            ]);
+
+            let online = false;
+            const status = { ...this._status };
+
+            if (hwResp.status === 'fulfilled' && hwResp.value.ok) {
+                const data = await hwResp.value.json();
+                Object.assign(status, { online: true, firmware: data.firmware || status.firmware || '--', model: data.model || status.model, serial: data.serial || status.serial });
+                online = true;
             }
+            if (brightResp.status === 'fulfilled' && brightResp.value.ok) {
+                try { const d = await brightResp.value.json(); status.brightness = d.brightness ?? d.value ?? status.brightness; } catch {}
+                online = true;
+            }
+            if (inputResp.status === 'fulfilled' && inputResp.value.ok) {
+                try { const d = await inputResp.value.json(); status.input = d.source ?? d.input ?? status.input; } catch {}
+                online = true;
+            }
+            if (tempResp.status === 'fulfilled' && tempResp.value.ok) {
+                try { const d = await tempResp.value.json(); status.temperature = d.temperature ?? d.temp ?? status.temperature; } catch {}
+            }
+
+            status.online = online;
+            this._status = status;
+
+            // Update the active processor's online flag
+            if (this._activeProc) this._activeProc.online = online;
+
         } catch {
-            this._status = { online: false };
+            this._status = { ...this._status, online: false };
+            if (this._activeProc) this._activeProc.online = false;
         }
+
+        // Refresh UI if status changed
+        if (wasOnline !== this._status.online) {
+            this.refresh();
+            this._saveProcessors();
+        }
+        // Update inline status elements
+        this._updateStatusDisplay();
+    },
+
+    _updateStatusDisplay() {
+        // Update the online/offline badge
+        const badge = document.querySelector('.led-status');
+        if (badge) {
+            badge.className = `led-status ${this._status.online ? 'led-status-on' : 'led-status-off'}`;
+            badge.textContent = this._status.online ? 'ONLINE' : 'OFFLINE';
+        }
+        // Update brightness display
+        const brightEl = document.getElementById('led-brightness-val');
+        if (brightEl && this._status.brightness !== undefined) brightEl.textContent = `${this._status.brightness}%`;
+        // Update temperature display
+        const tempEl = document.getElementById('led-temp-val');
+        if (tempEl && this._status.temperature !== undefined) tempEl.textContent = `${this._status.temperature}\u00B0C`;
+    },
+
+    async _reconnect() {
+        if (!this._activeProc || this._activeProc.virtual) return;
+        UI.toast(`Reconnecting to ${this._activeProc.name}...`, 'info');
+        await this._fetchStatus();
+        this.refresh();
+        UI.toast(this._status.online ? `Connected to ${this._activeProc.name}` : `Cannot reach ${this._activeProc.name}`, this._status.online ? 'success' : 'error');
     },
 
     _saveProcessors() {
@@ -1188,9 +1252,11 @@ const LedProcessorPage = {
     onActivate() {
         this._loadProcessors();
         this.refresh();
+        // Poll status every 5 seconds for live data updates
+        if (this._activeProc && !this._activeProc.virtual) this._fetchStatus();
         this._pollTimer = setInterval(() => {
             if (this._activeProc && !this._activeProc.virtual) this._fetchStatus();
-        }, 10000);
+        }, 5000);
     },
 
     onDeactivate() {

@@ -86,6 +86,7 @@ const LightingPage = {
         <div class="section-header">
             <h2><i class="fas fa-lightbulb"></i> Lighting Console Controller</h2>
             <div class="flex gap-sm">
+                <button class="btn btn-sm" onclick="LightingPage._reconnectAll()" title="Reconnect all consoles"><i class="fas fa-sync-alt"></i> Reconnect</button>
                 <button class="btn btn-sm btn-primary" onclick="LightingPage.showAddConsole()"><i class="fas fa-plus"></i> Add Console</button>
             </div>
         </div>
@@ -703,6 +704,16 @@ const LightingPage = {
     // ============================================================
     // POLLING / LIFECYCLE
     // ============================================================
+    async _reconnectAll() {
+        UI.toast('Reconnecting all consoles...', 'info');
+        for (const con of this._consoles) {
+            if (!con.virtual) await this._checkConnection(con);
+        }
+        this._refreshAll();
+        const online = this._consoles.filter(c => c.connected).length;
+        UI.toast(`${online}/${this._consoles.length} consoles connected`, online > 0 ? 'success' : 'error');
+    },
+
     _startPolling() {
         this._stopPolling();
         this._pollTimer = setInterval(() => this._pollAll(), this._pollInterval);

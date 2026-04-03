@@ -62,10 +62,11 @@ const PtzPage = {
             powerOn:      () => '#O1',
             powerOff:     () => '#O0',
 
-            // Tally
-            tallyRed:     () => '#DA1',
-            tallyGreen:   () => '#DA2', // Some models
-            tallyOff:     () => '#DA0',
+            // Tally (Program = red lamp, Preview = green lamp)
+            tallyRed:     () => '#DA1',        // Red tally ON
+            tallyGreen:   () => '#TLG1',       // Green tally ON (AW-HE/UE series preview lamp)
+            tallyOff:     () => '#DA0',        // Red tally OFF
+            tallyGreenOff:() => '#TLG0',       // Green tally OFF
 
             // Query
             queryPanTilt: () => '#APC',
@@ -206,6 +207,7 @@ const PtzPage = {
         <div class="section-header">
             <h2><i class="fas fa-video"></i> PTZ Camera Controller</h2>
             <div class="flex gap-sm">
+                <button class="btn btn-sm" onclick="PtzPage._reconnectAll()" title="Reconnect all cameras"><i class="fas fa-sync-alt"></i> Reconnect</button>
                 <button class="btn btn-sm btn-primary" onclick="PtzPage.showAddCamera()"><i class="fas fa-plus"></i> Add Camera</button>
             </div>
         </div>
@@ -317,6 +319,25 @@ const PtzPage = {
                     <div style="margin-top:8px">
                         <label class="text-muted" style="font-size:11px">Zoom Speed</label>
                         <input type="range" id="ptz-zoom-speed" min="1" max="49" value="25" style="width:100%">
+                    </div>
+                    <!-- Live position readout -->
+                    <div style="margin-top:12px;display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:4px;text-align:center;">
+                        <div style="background:var(--bg-secondary);padding:4px 6px;border-radius:var(--radius-sm);border:1px solid var(--border)">
+                            <div style="font-size:9px;color:var(--text-muted)">PAN</div>
+                            <div id="ptz-pan-val" style="font-size:11px;font-weight:700;font-family:monospace;color:var(--text-primary)">--</div>
+                        </div>
+                        <div style="background:var(--bg-secondary);padding:4px 6px;border-radius:var(--radius-sm);border:1px solid var(--border)">
+                            <div style="font-size:9px;color:var(--text-muted)">TILT</div>
+                            <div id="ptz-tilt-val" style="font-size:11px;font-weight:700;font-family:monospace;color:var(--text-primary)">--</div>
+                        </div>
+                        <div style="background:var(--bg-secondary);padding:4px 6px;border-radius:var(--radius-sm);border:1px solid var(--border)">
+                            <div style="font-size:9px;color:var(--text-muted)">ZOOM</div>
+                            <div id="ptz-zoom-val" style="font-size:11px;font-weight:700;font-family:monospace;color:var(--text-primary)">--</div>
+                        </div>
+                        <div style="background:var(--bg-secondary);padding:4px 6px;border-radius:var(--radius-sm);border:1px solid var(--border)">
+                            <div style="font-size:9px;color:var(--text-muted)">FOCUS</div>
+                            <div id="ptz-focus-val" style="font-size:11px;font-weight:700;font-family:monospace;color:var(--text-primary)">--</div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -727,9 +748,10 @@ const PtzPage = {
     },
 
     _updateCamDot(cam) {
-        // Lightweight update of status dot without full re-render
+        // Update both main page list AND sidebar list
         const list = document.getElementById('ptz-cam-list');
         if (list) list.innerHTML = this._renderCameraList();
+        this.renderSidebarList();
     },
 
     // ============================================================
@@ -912,11 +934,19 @@ const PtzPage = {
         const cam = this._cameras.find(c => c.id === id);
         if (!cam) return;
         cam.tally = cam.tally === state ? 'off' : state; // Toggle
+
         if (cam.type === 'panasonic') {
-            const cmd = cam.tally === 'red' ? this._panasonic.commands.tallyRed()
-                      : cam.tally === 'green' ? this._panasonic.commands.tallyGreen()
-                      : this._panasonic.commands.tallyOff();
-            this._sendPanasonic(cam, 'ptz', cmd);
+            // Panasonic: red and green are separate lamp commands
+            if (cam.tally === 'red') {
+                this._sendPanasonic(cam, 'ptz', this._panasonic.commands.tallyGreenOff()); // green off
+                this._sendPanasonic(cam, 'ptz', this._panasonic.commands.tallyRed());      // red on
+            } else if (cam.tally === 'green') {
+                this._sendPanasonic(cam, 'ptz', this._panasonic.commands.tallyOff());      // red off
+                this._sendPanasonic(cam, 'ptz', this._panasonic.commands.tallyGreen());    // green on
+            } else {
+                this._sendPanasonic(cam, 'ptz', this._panasonic.commands.tallyOff());      // red off
+                this._sendPanasonic(cam, 'ptz', this._panasonic.commands.tallyGreenOff()); // green off
+            }
         } else {
             const mode = cam.tally === 'red' ? 'PGM' : cam.tally === 'green' ? 'PVW' : 'Off';
             this._sendBirddog(cam, 'tally', { TallyMode: mode });
@@ -1065,6 +1095,19 @@ const PtzPage = {
     },
 
     // ============================================================
+    // RECONNECT
+    // ============================================================
+    async _reconnectAll() {
+        UI.toast('Reconnecting all cameras...', 'info');
+        for (const cam of this._cameras) {
+            if (!cam.virtual) await this._checkConnection(cam);
+        }
+        this._refreshAll();
+        const online = this._cameras.filter(c => c.connected).length;
+        UI.toast(`${online}/${this._cameras.length} cameras connected`, online > 0 ? 'success' : 'error');
+    },
+
+    // ============================================================
     // POLLING
     // ============================================================
     _startPolling() {
@@ -1078,7 +1121,65 @@ const PtzPage = {
 
     async _pollAll() {
         for (const cam of this._cameras) {
-            if (!cam.virtual) await this._checkConnection(cam);
+            if (!cam.virtual) {
+                await this._checkConnection(cam);
+                // Also poll position values for the selected camera
+                if (cam.connected && cam.id === this._selectedId) {
+                    await this._pollPosition(cam);
+                }
+            }
+        }
+    },
+
+    async _pollPosition(cam) {
+        if (cam.type === 'panasonic') {
+            // Query pan/tilt position
+            const ptRes = await this._sendPanasonic(cam, 'ptz', this._panasonic.commands.queryPanTilt());
+            if (ptRes) {
+                // Response format: aPC<pan_hex><tilt_hex> e.g. aPC7FFF7FFF
+                const m = ptRes.match(/aPC([0-9A-Fa-f]{4})([0-9A-Fa-f]{4})/);
+                if (m) {
+                    cam._panPos = parseInt(m[1], 16);
+                    cam._tiltPos = parseInt(m[2], 16);
+                }
+            }
+            // Query zoom position
+            const zRes = await this._sendPanasonic(cam, 'ptz', this._panasonic.commands.queryZoom());
+            if (zRes) {
+                const zm = zRes.match(/gz([0-9A-Fa-f]{3})/);
+                if (zm) cam._zoomPos = parseInt(zm[1], 16);
+            }
+            // Query focus position
+            const fRes = await this._sendPanasonic(cam, 'ptz', this._panasonic.commands.queryFocus());
+            if (fRes) {
+                const fm = fRes.match(/gf([0-9A-Fa-f]{3})/);
+                if (fm) cam._focusPos = parseInt(fm[1], 16);
+            }
+            // Update position display
+            this._updatePositionDisplay(cam);
+        }
+    },
+
+    _updatePositionDisplay(cam) {
+        const panEl = document.getElementById('ptz-pan-val');
+        const tiltEl = document.getElementById('ptz-tilt-val');
+        const zoomEl = document.getElementById('ptz-zoom-val');
+        const focusEl = document.getElementById('ptz-focus-val');
+        if (panEl && cam._panPos !== undefined) {
+            const panDeg = ((cam._panPos - 0x7FFF) / 0x7FFF * 175).toFixed(1);
+            panEl.textContent = `${panDeg > 0 ? '+' : ''}${panDeg}\u00B0`;
+        }
+        if (tiltEl && cam._tiltPos !== undefined) {
+            const tiltDeg = ((cam._tiltPos - 0x7FFF) / 0x7FFF * 30).toFixed(1);
+            tiltEl.textContent = `${tiltDeg > 0 ? '+' : ''}${tiltDeg}\u00B0`;
+        }
+        if (zoomEl && cam._zoomPos !== undefined) {
+            const zoomPct = (cam._zoomPos / 0xFFF * 100).toFixed(0);
+            zoomEl.textContent = `${zoomPct}%`;
+        }
+        if (focusEl && cam._focusPos !== undefined) {
+            const focusPct = (cam._focusPos / 0xFFF * 100).toFixed(0);
+            focusEl.textContent = `${focusPct}%`;
         }
     },
 

@@ -1498,9 +1498,11 @@ const HippoApp = {
                 switches: saved.switches !== false,
                 consoles: saved.consoles !== false,
                 intercom: saved.intercom !== false,
+                tools3d: saved.tools3d === true,           // disabled by default
+                captureViewer: saved.captureViewer === true, // disabled by default
             };
         } catch {
-            vis = { engines: true, ledProcessors: true, cameras: true, switches: true, consoles: true, intercom: true };
+            vis = { engines: true, ledProcessors: true, cameras: true, switches: true, consoles: true, intercom: true, tools3d: false, captureViewer: false };
         }
         const map = {
             engines: 'server-selector',
@@ -1514,6 +1516,17 @@ const HippoApp = {
             const el = document.getElementById(id);
             if (el) el.style.display = vis[key] ? '' : 'none';
         }
+
+        // Hide/show 3D Tools and Capture Viewer nav items based on settings
+        const hiddenPages = [];
+        if (!vis.tools3d) hiddenPages.push('stage3d', 'ledpanel3d');
+        if (!vis.captureViewer) hiddenPages.push('captureview');
+        document.querySelectorAll('.nav-item').forEach(item => {
+            const page = item.dataset.page;
+            if (hiddenPages.includes(page)) {
+                item.style.display = 'none';
+            }
+        });
 
         // Apply sidebar section ordering
         try {
