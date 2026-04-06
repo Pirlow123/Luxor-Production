@@ -773,7 +773,7 @@ const SettingsPage = {
 
     _updatesSection() {
         const s = this._updateState;
-        const currentVersion = '1.5.0';
+        const currentVersion = '1.5.1';
         const isElectron = typeof window.luxorUpdater !== 'undefined';
 
         let statusIcon, statusColor, statusText, actionBtn;
@@ -954,7 +954,7 @@ const SettingsPage = {
                         LED, PTZ, Network, Lighting, Intercom, 3D Visualization
                     </p>
                     <div class="mt-md" style="font-size:11px;color:var(--text-muted)">
-                        <p>Version: 1.5</p>
+                        <p>Version: 1.5.1</p>
                     </div>
                 </div>
             </div>

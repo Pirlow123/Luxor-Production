@@ -101,7 +101,7 @@ function createWindow() {
                     dialog.showMessageBox(mainWindow, {
                         type: 'info',
                         title: 'Luxor Production',
-                        message: 'Luxor Production v1.5',
+                        message: 'Luxor Production v1.5.1',
                         detail: 'Universal production control platform for live events, broadcast, and AV installations.\n\nMedia Servers: Hippotizer, Resolume Arena, vMix, CasparCG, OBS Studio, Barco E2/S3, QLab, Disguise, Pixera, Blackmagic ATEM\n\nLED Tools: LED Calculator, LED Setup Calc, PIXL Grid, Diagram Builder, LED Auto-Connect, 3D Stage Visualizer, 3D LED Layout\n\nProduction: Power Distribution, Fixture Patch, Truck Packer, Capture Viewer, Equipment Specifications\n\nNetwork & Control: LED Processors (Novastar, Helios, Brompton), PTZ Cameras, Network Switches, Lighting Consoles, Intercom Systems\n\nBuilt with Electron.',
                     });
                 }},
