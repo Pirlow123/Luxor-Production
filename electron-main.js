@@ -1,4 +1,5 @@
 const { app, BrowserWindow, Menu, dialog, ipcMain } = require('electron');
+const { autoUpdater } = require('electron-updater');
 const path = require('path');
 const fs = require('fs');
 
@@ -217,6 +218,81 @@ ipcMain.handle('export-file', async (event, { defaultName, content, filters }) =
         }
     }
     return { ok: false, canceled: true };
+});
+
+// ================================================================
+// AUTO-UPDATER (checks GitHub Releases)
+// ================================================================
+autoUpdater.autoDownload = false;
+autoUpdater.autoInstallOnAppQuit = true;
+
+function sendUpdateStatus(status, info) {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('updater-status', { status, ...info });
+    }
+}
+
+autoUpdater.on('checking-for-update', () => {
+    sendUpdateStatus('checking', {});
+});
+
+autoUpdater.on('update-available', (info) => {
+    sendUpdateStatus('available', {
+        version: info.version,
+        releaseDate: info.releaseDate,
+        releaseNotes: info.releaseNotes || '',
+    });
+});
+
+autoUpdater.on('update-not-available', (info) => {
+    sendUpdateStatus('up-to-date', { version: info.version });
+});
+
+autoUpdater.on('download-progress', (progress) => {
+    sendUpdateStatus('downloading', {
+        percent: Math.round(progress.percent),
+        transferred: progress.transferred,
+        total: progress.total,
+        speed: progress.bytesPerSecond,
+    });
+});
+
+autoUpdater.on('update-downloaded', (info) => {
+    sendUpdateStatus('ready', { version: info.version });
+});
+
+autoUpdater.on('error', (err) => {
+    sendUpdateStatus('error', { message: err?.message || 'Unknown error' });
+});
+
+// IPC: renderer asks to check for updates
+ipcMain.handle('updater-check', async () => {
+    try {
+        const result = await autoUpdater.checkForUpdates();
+        return { ok: true };
+    } catch (e) {
+        return { ok: false, error: e.message };
+    }
+});
+
+// IPC: renderer asks to download the update
+ipcMain.handle('updater-download', async () => {
+    try {
+        await autoUpdater.downloadUpdate();
+        return { ok: true };
+    } catch (e) {
+        return { ok: false, error: e.message };
+    }
+});
+
+// IPC: renderer asks to install and restart
+ipcMain.handle('updater-install', () => {
+    autoUpdater.quitAndInstall(false, true);
+});
+
+// IPC: get current app version
+ipcMain.handle('get-app-version', () => {
+    return app.getVersion();
 });
 
 // Handle app lifecycle

@@ -1,5 +1,14 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
+// Auto-updater API
+contextBridge.exposeInMainWorld('luxorUpdater', {
+    check: () => ipcRenderer.invoke('updater-check'),
+    download: () => ipcRenderer.invoke('updater-download'),
+    install: () => ipcRenderer.invoke('updater-install'),
+    getVersion: () => ipcRenderer.invoke('get-app-version'),
+    onStatus: (callback) => ipcRenderer.on('updater-status', (_, data) => callback(data)),
+});
+
 contextBridge.exposeInMainWorld('luxorProject', {
     save: (filePath, data) => ipcRenderer.invoke('save-project', { path: filePath, data }),
     getPath: () => ipcRenderer.invoke('get-project-path'),

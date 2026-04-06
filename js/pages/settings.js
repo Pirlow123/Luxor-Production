@@ -31,6 +31,7 @@ const SettingsPage = {
             case 'api': return this._apiSection();
             case 'companion': return this._companionSection();
             case 'display': return this._displaySection();
+            case 'updates': return this._updatesSection();
             case 'about': return this._aboutSection();
             default: return '';
         }
@@ -765,6 +766,176 @@ const SettingsPage = {
         if (el) el.innerHTML = this._renderSection();
     },
 
+    // ================================================================
+    // AUTO-UPDATER SECTION
+    // ================================================================
+    _updateState: { status: 'idle', version: null, percent: 0, message: '' },
+
+    _updatesSection() {
+        const s = this._updateState;
+        const currentVersion = '1.5.0';
+        const isElectron = typeof window.luxorUpdater !== 'undefined';
+
+        let statusIcon, statusColor, statusText, actionBtn;
+        switch (s.status) {
+            case 'checking':
+                statusIcon = 'fa-spinner fa-spin';
+                statusColor = 'var(--blue)';
+                statusText = 'Checking for updates...';
+                actionBtn = '';
+                break;
+            case 'available':
+                statusIcon = 'fa-arrow-circle-up';
+                statusColor = '#4ade80';
+                statusText = `Update available: v${s.version}`;
+                actionBtn = `<button class="btn btn-primary" onclick="SettingsPage._downloadUpdate()"><i class="fas fa-download"></i> Download Update</button>`;
+                break;
+            case 'downloading':
+                statusIcon = 'fa-spinner fa-spin';
+                statusColor = 'var(--blue)';
+                statusText = `Downloading... ${s.percent}%`;
+                actionBtn = '';
+                break;
+            case 'ready':
+                statusIcon = 'fa-check-circle';
+                statusColor = '#4ade80';
+                statusText = `Update v${s.version} downloaded — ready to install`;
+                actionBtn = `<button class="btn btn-primary" onclick="SettingsPage._installUpdate()"><i class="fas fa-redo"></i> Restart & Install</button>`;
+                break;
+            case 'up-to-date':
+                statusIcon = 'fa-check-circle';
+                statusColor = '#4ade80';
+                statusText = 'You are up to date!';
+                actionBtn = '';
+                break;
+            case 'error':
+                statusIcon = 'fa-exclamation-triangle';
+                statusColor = '#f87171';
+                statusText = `Update error: ${s.message}`;
+                actionBtn = '';
+                break;
+            default:
+                statusIcon = 'fa-cloud-download-alt';
+                statusColor = 'var(--text-muted)';
+                statusText = 'Click below to check for updates';
+                actionBtn = '';
+        }
+
+        return `
+            <div class="card">
+                <div class="card-header"><h3><i class="fas fa-cloud-download-alt"></i> Software Updates</h3></div>
+                <div class="card-body" style="text-align:center;padding:32px">
+                    <div style="margin-bottom:24px">
+                        <i class="fas ${statusIcon}" style="font-size:48px;color:${statusColor};margin-bottom:16px;display:block"></i>
+                        <p style="font-size:14px;font-weight:600;margin-bottom:4px">${statusText}</p>
+                        <p style="color:var(--text-muted);font-size:12px">Current version: v${currentVersion}</p>
+                    </div>
+
+                    ${s.status === 'downloading' ? `
+                        <div style="background:var(--bg-tertiary);border-radius:8px;height:8px;overflow:hidden;margin:16px auto;max-width:400px;">
+                            <div style="background:var(--blue);height:100%;width:${s.percent}%;border-radius:8px;transition:width 0.3s ease"></div>
+                        </div>
+                        <p style="color:var(--text-muted);font-size:11px">${this._formatBytes(s.transferred || 0)} / ${this._formatBytes(s.total || 0)}</p>
+                    ` : ''}
+
+                    ${s.status === 'available' && s.releaseNotes ? `
+                        <div style="text-align:left;max-width:500px;margin:16px auto;padding:12px;background:var(--bg-tertiary);border-radius:var(--radius);font-size:12px;color:var(--text-secondary);max-height:200px;overflow-y:auto;">
+                            <strong style="display:block;margin-bottom:8px">Release Notes:</strong>
+                            ${typeof s.releaseNotes === 'string' ? s.releaseNotes.replace(/\n/g, '<br>') : ''}
+                        </div>
+                    ` : ''}
+
+                    <div style="display:flex;gap:8px;justify-content:center;margin-top:20px;">
+                        ${s.status !== 'checking' && s.status !== 'downloading' ? `
+                            <button class="btn btn-primary" onclick="SettingsPage._checkForUpdates()">
+                                <i class="fas fa-sync"></i> Check for Updates
+                            </button>
+                        ` : ''}
+                        ${actionBtn}
+                    </div>
+
+                    ${!isElectron ? `
+                        <div style="margin-top:16px;padding:10px;background:rgba(251,191,36,0.1);border:1px solid rgba(251,191,36,0.3);border-radius:var(--radius);max-width:400px;margin-left:auto;margin-right:auto;">
+                            <p style="color:#fbbf24;font-size:11px;margin:0">
+                                <i class="fas fa-exclamation-triangle"></i> Auto-update is only available in the desktop Electron app.
+                                In browser mode, download the latest version from GitHub.
+                            </p>
+                        </div>
+                    ` : ''}
+                </div>
+            </div>
+
+            <div class="card" style="margin-top:16px;">
+                <div class="card-header"><h3><i class="fab fa-github"></i> Manual Download</h3></div>
+                <div class="card-body">
+                    <p style="color:var(--text-secondary);font-size:12px;margin-bottom:12px">
+                        You can also download the latest version directly from GitHub:
+                    </p>
+                    <a href="https://github.com/Pirlow123/Luxor-Production/releases"
+                       style="color:var(--blue);font-size:12px;text-decoration:underline;cursor:pointer"
+                       onclick="if(window.require){require('electron').shell.openExternal(this.href);return false;}">
+                        github.com/Pirlow123/Luxor-Production/releases
+                    </a>
+                </div>
+            </div>
+        `;
+    },
+
+    _formatBytes(bytes) {
+        if (bytes === 0) return '0 B';
+        const k = 1024;
+        const sizes = ['B', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+    },
+
+    async _checkForUpdates() {
+        if (typeof window.luxorUpdater === 'undefined') {
+            UI.toast('Auto-update only works in the desktop app', 'warning');
+            return;
+        }
+        this._updateState = { status: 'checking' };
+        this._refreshUpdatesUI();
+        const result = await window.luxorUpdater.check();
+        if (!result.ok) {
+            this._updateState = { status: 'error', message: result.error };
+            this._refreshUpdatesUI();
+        }
+    },
+
+    async _downloadUpdate() {
+        if (typeof window.luxorUpdater === 'undefined') return;
+        this._updateState.status = 'downloading';
+        this._updateState.percent = 0;
+        this._refreshUpdatesUI();
+        const result = await window.luxorUpdater.download();
+        if (!result.ok) {
+            this._updateState = { status: 'error', message: result.error };
+            this._refreshUpdatesUI();
+        }
+    },
+
+    _installUpdate() {
+        if (typeof window.luxorUpdater === 'undefined') return;
+        window.luxorUpdater.install();
+    },
+
+    _refreshUpdatesUI() {
+        if (this._section === 'updates') {
+            const el = document.getElementById('settings-content');
+            if (el) el.innerHTML = this._renderSection();
+        }
+    },
+
+    _initUpdaterListener() {
+        if (typeof window.luxorUpdater !== 'undefined') {
+            window.luxorUpdater.onStatus((data) => {
+                this._updateState = data;
+                this._refreshUpdatesUI();
+            });
+        }
+    },
+
     _aboutSection() {
         return `
             <div class="card">
@@ -798,6 +969,8 @@ const SettingsPage = {
     },
 
     onActivate() {
+        // Set up updater listener
+        this._initUpdaterListener();
         // Set up live button updates from Companion
         CompanionAPI._onButtonUpdate = () => {
             if (this._section === 'companion') {

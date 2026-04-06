@@ -719,15 +719,30 @@ const LedProcessorPage = {
         if (!this._activeProc || this._activeProc.virtual) return null;
         const proto = this._activeProc.port === 443 ? 'https' : 'http';
         const host = `${proto}://${this._activeProc.host}:${this._activeProc.port}`;
+        const url = `${host}/api/v1/public`;
+        const bodyStr = JSON.stringify(nestedBody);
+        console.log(`[Helios] POST ${url}`, bodyStr);
         try {
-            const resp = await fetch(`${host}/api/v1/public`, {
+            const resp = await fetch(url, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(nestedBody),
+                body: bodyStr,
                 signal: AbortSignal.timeout(5000),
             });
-            if (resp.ok) { try { return await resp.json(); } catch { return null; } }
-        } catch {}
+            const statusCode = resp.status;
+            let respBody = null;
+            try { respBody = await resp.text(); } catch {}
+            console.log(`[Helios] POST → ${statusCode}`, respBody);
+            if (resp.ok) {
+                try { return JSON.parse(respBody); } catch { return { _ok: true }; }
+            } else {
+                console.error(`[Helios] POST failed: ${statusCode}`, respBody);
+                UI.toast(`Helios: ${statusCode} error`, 'error');
+            }
+        } catch (e) {
+            console.error('[Helios] POST error:', e);
+            UI.toast(`Helios: ${e.message}`, 'error');
+        }
         return null;
     },
 
@@ -751,7 +766,14 @@ const LedProcessorPage = {
         this._status.displayMode = mode;
         const brand = this._activeProc ? this._getBrand(this._activeProc) : null;
         if (brand === 'megapixel') {
-            await this._heliosPost({ dev: { display: { blackout: mode === 'Blackout' } } });
+            // Helios has separate blackout and freeze fields
+            if (mode === 'Blackout') {
+                await this._heliosPost({ dev: { display: { blackout: true, freeze: false } } });
+            } else if (mode === 'Freeze') {
+                await this._heliosPost({ dev: { display: { blackout: false, freeze: true } } });
+            } else {
+                await this._heliosPost({ dev: { display: { blackout: false, freeze: false } } });
+            }
         } else {
             await this._apiAction('PUT', 'setMode', { mode: mode.toLowerCase(), displayMode: mode });
         }
@@ -777,7 +799,18 @@ const LedProcessorPage = {
         this._status.testPattern = pattern === 'Off' ? null : pattern;
         const brand = this._activeProc ? this._getBrand(this._activeProc) : null;
         if (brand === 'megapixel') {
-            await this._heliosPost({ dev: { ingest: { testPattern: { enabled: pattern !== 'Off', type: pattern === 'Off' ? '' : pattern.toLowerCase() } } } });
+            // Map UI names to Helios API pattern type names
+            const heliosPatternMap = {
+                'Off': '', 'White': 'white', 'Red': 'red', 'Green': 'green', 'Blue': 'blue',
+                'Horizontal': 'horizontalGradient', 'Vertical': 'verticalGradient', 'Gradient': 'diagonalGradient',
+                'Grid': 'grid', 'Crosshatch': 'smallGrid', 'Color Bars': 'colorBars', 'Moving': 'diagonal',
+            };
+            const heliosType = heliosPatternMap[pattern] || pattern.toLowerCase();
+            if (pattern === 'Off') {
+                await this._heliosPost({ dev: { ingest: { testPattern: { enabled: false } } } });
+            } else {
+                await this._heliosPost({ dev: { ingest: { testPattern: { enabled: true, type: heliosType } } } });
+            }
         } else {
             await this._apiAction('PUT', 'setPattern', { mode: pattern.toLowerCase(), pattern, state: pattern !== 'Off', enabled: pattern !== 'Off' });
         }
@@ -1509,34 +1542,68 @@ const LedProcessorPage = {
 
                     try {
                         const data = await hwResp.json();
+                        if (brand === 'megapixel') console.log('[Helios] GET /api/v1/public raw response:', JSON.stringify(data).substring(0, 3000));
 
-                        // Megapixel Helios: single /api/v1/public endpoint returns everything under data.dev.*
-                        if (brand === 'megapixel' && data?.data?.dev) {
-                            const dev = data.data.dev;
-                            const disp = dev.display || {};
-                            const ingest = dev.ingest || {};
-                            const sys = dev.system || dev.info || {};
-                            Object.assign(status, {
-                                online: true,
-                                firmware: sys.firmware || sys.version || sys.sw_version || status.firmware || '--',
-                                model: sys.model || sys.productName || 'Helios',
-                                serial: sys.serial || sys.serialNumber || status.serial,
-                                brightness: disp.brightness ?? status.brightness,
-                                gamma: disp.gamma ?? status.gamma,
-                                colorTemp: disp.cct ?? status.colorTemp,
-                                outputWidth: disp.width ?? status.outputWidth,
-                                outputHeight: disp.height ?? status.outputHeight,
-                                displayMode: disp.blackout ? 'Blackout' : 'Normal',
-                                activeInput: ingest.input ?? status.activeInput,
-                                testPattern: ingest.testPattern?.enabled ? (ingest.testPattern.type || 'On') : null,
-                                // Helios-specific fields
-                                _heliosRaw: dev,
-                                redundancyState: disp.redundancy?.state,
-                                redundancyRole: disp.redundancy?.role,
-                            });
-                            // Parse available inputs from ingest.inputs
-                            if (ingest.inputs) {
-                                status.inputs = Object.keys(ingest.inputs).filter(k => ingest.inputs[k]?.valid !== false);
+                        // Megapixel Helios parsing — try multiple response structures
+                        if (brand === 'megapixel') {
+                            // Try to find the device data in various possible nesting structures
+                            const dev = data?.data?.dev || data?.dev || data?.data || data;
+                            const disp = dev?.display || dev?.output || {};
+                            const ingest = dev?.ingest || dev?.input || {};
+                            const sys = dev?.system || dev?.info || dev?.device || {};
+
+                            // Store raw response for debugging
+                            status._heliosRaw = data;
+                            status.online = true;
+
+                            // Try to extract fields from wherever they exist in the response
+                            const flat = JSON.stringify(data);
+
+                            // Firmware / model / serial — try nested then top-level
+                            status.firmware = sys.firmware || sys.version || sys.sw_version || data.firmware || data.version || status.firmware || '--';
+                            status.model = sys.model || sys.productName || data.model || data.productName || 'Helios';
+                            status.serial = sys.serial || sys.serialNumber || data.serial || data.serialNumber || status.serial;
+
+                            // Brightness — could be display.brightness, dev.brightness, or top-level
+                            status.brightness = disp.brightness ?? dev?.brightness ?? data.brightness ?? status.brightness;
+                            status.gamma = disp.gamma ?? dev?.gamma ?? data.gamma ?? status.gamma;
+                            status.colorTemp = disp.cct ?? disp.colorTemp ?? dev?.cct ?? data.cct ?? status.colorTemp;
+                            status.outputWidth = disp.width ?? disp.outputWidth ?? dev?.width ?? data.width ?? status.outputWidth;
+                            status.outputHeight = disp.height ?? disp.outputHeight ?? dev?.height ?? data.height ?? status.outputHeight;
+
+                            // Display mode — Helios has separate blackout and freeze
+                            if (disp.blackout) {
+                                status.displayMode = 'Blackout';
+                            } else if (disp.freeze) {
+                                status.displayMode = 'Freeze';
+                            } else if (dev?.blackout) {
+                                status.displayMode = 'Blackout';
+                            } else if (dev?.freeze) {
+                                status.displayMode = 'Freeze';
+                            } else {
+                                status.displayMode = 'Normal';
+                            }
+
+                            // Input
+                            status.activeInput = ingest.input ?? ingest.source ?? ingest.activeInput ?? dev?.activeInput ?? data.activeInput ?? status.activeInput;
+
+                            // Test pattern
+                            const tp = ingest.testPattern || disp.testPattern || dev?.testPattern;
+                            if (tp) {
+                                status.testPattern = tp.enabled ? (tp.type || tp.pattern || 'On') : null;
+                            }
+
+                            // Redundancy
+                            const red = disp.redundancy || dev?.redundancy;
+                            if (red) {
+                                status.redundancyState = red.state;
+                                status.redundancyRole = red.role;
+                            }
+
+                            // Available inputs
+                            const inputs = ingest.inputs || dev?.inputs;
+                            if (inputs && typeof inputs === 'object') {
+                                status.inputs = Array.isArray(inputs) ? inputs : Object.keys(inputs).filter(k => inputs[k]?.valid !== false);
                             }
                         } else {
                             // Novastar / Brompton: standard per-field parsing

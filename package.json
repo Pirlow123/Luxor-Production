@@ -13,6 +13,7 @@
     "build:all": "electron-builder --win --mac --linux"
   },
   "dependencies": {
+    "electron-updater": "^6.8.3",
     "ws": "^8.20.0",
     "xlsx": "^0.18.5"
   },
@@ -35,7 +36,26 @@
       "assets/**/*",
       "mock-server.js",
       "node_modules/ws/**/*",
-      "node_modules/xlsx/**/*"
+      "node_modules/xlsx/**/*",
+      "node_modules/electron-updater/**/*",
+      "node_modules/builder-util-runtime/**/*",
+      "node_modules/lazy-val/**/*",
+      "node_modules/semver/**/*",
+      "node_modules/tiny-typed-emitter/**/*",
+      "node_modules/lodash.isequal/**/*",
+      "node_modules/lodash.escaperegexp/**/*",
+      "node_modules/js-yaml/**/*",
+      "node_modules/fs-extra/**/*",
+      "node_modules/jsonfile/**/*",
+      "node_modules/graceful-fs/**/*",
+      "node_modules/universalify/**/*"
+    ],
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "Pirlow123",
+        "repo": "Luxor-Production"
+      }
     ],
     "win": {
       "target": [
@@ -55,7 +75,7 @@
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "shortcutName": "Luxor Production",
-      "artifactName": "Luxor Production 1.5 setup.${ext}"
+      "artifactName": "Luxor-Production-${version}-setup.${ext}"
     },
     "mac": {
       "target": [
