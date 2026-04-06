@@ -1,7 +1,7 @@
 /**
  * Luxor Production — Disguise (d3) REST API Client
  * Base URL: http://<host>:80/api/session
- * Docs: https://developer.disguise.one/
+ * Docs: https://developer.disguise.one/api/introduction/
  */
 class DisguiseAPI {
     constructor() {
@@ -60,184 +60,204 @@ class DisguiseAPI {
     }
 
     // ================================================================
-    // SESSION STATUS
-    // ================================================================
-
-    /** GET /session/status — session state, fps, project name */
-    async getStatus() { return this.request('/session/status'); }
-
-    /** GET /session/transport — play/pause/speed/currentTime */
-    async getTransportStatus() { return this.request('/session/transport'); }
-
-    // ================================================================
     // TRANSPORT CONTROL
     // ================================================================
 
     /** POST /session/transport/play */
     async play() { return this.request('/session/transport/play', { method: 'POST' }); }
 
-    /** POST /session/transport/pause */
+    /** POST /session/transport/pause — pause playback */
     async pause() { return this.request('/session/transport/pause', { method: 'POST' }); }
 
     /** POST /session/transport/stop */
     async stop() { return this.request('/session/transport/stop', { method: 'POST' }); }
 
-    /** POST /session/transport/goToTime — jump to specific time */
-    async goToTime(time) { return this.request('/session/transport/goToTime', { method: 'POST', body: { time } }); }
+    /** POST /session/transport/returntostart */
+    async returnToStart() { return this.request('/session/transport/returntostart', { method: 'POST' }); }
 
-    /** POST /session/transport/goToNextSection */
-    async goToNextSection() { return this.request('/session/transport/goToNextSection', { method: 'POST' }); }
+    /** POST /session/transport/playsection — play to end of current section */
+    async playSection() { return this.request('/session/transport/playsection', { method: 'POST' }); }
 
-    /** POST /session/transport/goToPrevSection */
-    async goToPrevSection() { return this.request('/session/transport/goToPrevSection', { method: 'POST' }); }
+    /** POST /session/transport/playloopsection — loop current section */
+    async playLoopSection() { return this.request('/session/transport/playloopsection', { method: 'POST' }); }
 
-    /** POST /session/transport/goToSection — jump to section by index */
-    async goToSection(sectionIndex) { return this.request('/session/transport/goToSection', { method: 'POST', body: { index: sectionIndex } }); }
+    /** POST /session/transport/gotoframe — jump to frame */
+    async goToFrame(transport, frame, playmode) { return this.request('/session/transport/gotoframe', { method: 'POST', body: { transport, frame, playmode } }); }
 
-    // ================================================================
-    // TRACKS
-    // ================================================================
+    /** POST /session/transport/gototime — jump to time position */
+    async goToTime(transport, time, playmode) { return this.request('/session/transport/gototime', { method: 'POST', body: { transport, time, playmode } }); }
 
-    /** GET /session/tracks — list all tracks */
-    async getTracks() { return this.request('/session/tracks'); }
+    /** POST /session/transport/gototimecode — jump to timecode */
+    async goToTimecode(transport, timecode, playmode) { return this.request('/session/transport/gototimecode', { method: 'POST', body: { transport, timecode, playmode } }); }
 
-    /** GET /session/tracks/{trackId} — single track details */
-    async getTrack(trackId) { return this.request(`/session/tracks/${trackId}`); }
+    /** POST /session/transport/gototrack — jump to start of track */
+    async goToTrack(transport, track, playmode) { return this.request('/session/transport/gototrack', { method: 'POST', body: { transport, track, playmode } }); }
 
-    /** PUT /session/tracks/{trackId}/volume — set track volume */
-    async setTrackVolume(trackId, volume) { return this.request(`/session/tracks/${trackId}/volume`, { method: 'PUT', body: { volume } }); }
+    /** POST /session/transport/gotonexttrack */
+    async goToNextTrack() { return this.request('/session/transport/gotonexttrack', { method: 'POST' }); }
 
-    /** PUT /session/tracks/{trackId}/brightness — set track brightness */
-    async setTrackBrightness(trackId, brightness) { return this.request(`/session/tracks/${trackId}/brightness`, { method: 'PUT', body: { brightness } }); }
+    /** POST /session/transport/gotoprevtrack */
+    async goToPrevTrack() { return this.request('/session/transport/gotoprevtrack', { method: 'POST' }); }
 
-    /** POST /session/tracks/{trackId}/mute */
-    async muteTrack(trackId) { return this.request(`/session/tracks/${trackId}/mute`, { method: 'POST' }); }
+    /** POST /session/transport/gotosection — jump to section */
+    async goToSection(transport, section, playmode) { return this.request('/session/transport/gotosection', { method: 'POST', body: { transport, section, playmode } }); }
 
-    /** POST /session/tracks/{trackId}/unmute */
-    async unmuteTrack(trackId) { return this.request(`/session/tracks/${trackId}/unmute`, { method: 'POST' }); }
+    /** POST /session/transport/gotonextsection */
+    async goToNextSection() { return this.request('/session/transport/gotonextsection', { method: 'POST' }); }
 
-    // ================================================================
-    // SECTIONS & ANNOTATIONS
-    // ================================================================
+    /** POST /session/transport/gotoprevsection */
+    async goToPrevSection() { return this.request('/session/transport/gotoprevsection', { method: 'POST' }); }
 
-    /** GET /session/sections — list all sections */
-    async getSections() { return this.request('/session/sections'); }
+    /** POST /session/transport/gotonote — navigate to a note */
+    async goToNote(transport, note, playmode) { return this.request('/session/transport/gotonote', { method: 'POST', body: { transport, note, playmode } }); }
 
-    /** GET /session/annotations — list all annotations */
-    async getAnnotations() { return this.request('/session/annotations'); }
+    /** POST /session/transport/gototag — jump to tag */
+    async goToTag(transport, tagType, tagValue, playmode) { return this.request('/session/transport/gototag', { method: 'POST', body: { transport, tagType, tagValue, playmode } }); }
 
-    // ================================================================
-    // RENDER STREAM & MACHINES
-    // ================================================================
+    /** POST /session/transport/volume — set transport volume */
+    async setVolume(transport, volume) { return this.request('/session/transport/volume', { method: 'POST', body: { transport, volume } }); }
 
-    /** GET /session/renderstream — render stream status */
-    async getRenderStream() { return this.request('/session/renderstream'); }
+    /** POST /session/transport/brightness — set transport brightness */
+    async setBrightness(transport, brightness) { return this.request('/session/transport/brightness', { method: 'POST', body: { transport, brightness } }); }
 
-    /** GET /session/machines — all d3 machines in the cluster */
-    async getMachines() { return this.request('/session/machines'); }
-
-    /** GET /session/outputs — display outputs */
-    async getOutputs() { return this.request('/session/outputs'); }
+    /** POST /session/transport/engaged — set engaged status */
+    async setEngaged(transport, engaged) { return this.request('/session/transport/engaged', { method: 'POST', body: { transport, engaged } }); }
 
     // ================================================================
-    // MASTER CONTROLS
+    // TRANSPORT QUERIES
     // ================================================================
 
-    /** PUT /session/master/brightness — set master brightness */
-    async setMasterBrightness(value) { return this.request('/session/master/brightness', { method: 'PUT', body: { value } }); }
+    /** GET /session/transport/activetransport — active transport */
+    async getActiveTransport() { return this.request('/session/transport/activetransport'); }
 
-    /** PUT /session/master/volume — set master volume */
-    async setMasterVolume(value) { return this.request('/session/master/volume', { method: 'PUT', body: { value } }); }
+    /** GET /session/transport/tracks — all tracks */
+    async getTracks() { return this.request('/session/transport/tracks'); }
 
-    // ================================================================
-    // SPATIAL / 3D
-    // ================================================================
+    /** GET /session/transport/annotations — annotations in a track */
+    async getAnnotations(uid) { return this.request(`/session/transport/annotations${uid ? '?uid=' + uid : ''}`); }
 
-    /** GET /session/spatialcalibrations — spatial calibration data */
-    async getSpatialCalibrations() { return this.request('/session/spatialcalibrations'); }
+    /** GET /session/transport/transports — all transports */
+    async getTransports() { return this.request('/session/transport/transports'); }
 
-    /** GET /session/projectors — all projector configurations with positions, rotations, lens data */
-    async getProjectors() { return this.request('/session/projectors'); }
-
-    /** GET /session/projectors/{uid} — single projector details */
-    async getProjector(uid) { return this.request(`/session/projectors/${uid}`); }
-
-    /** GET /session/screens — all screens with geometry, resolution, 3D transform */
-    async getScreens() { return this.request('/session/screens'); }
-
-    /** GET /session/screens/{uid} — single screen details */
-    async getScreen(uid) { return this.request(`/session/screens/${uid}`); }
-
-    /** GET /session/mappings — content mapping to screens */
-    async getMappings() { return this.request('/session/mappings'); }
-
-    /** GET /session/stageobjects — all 3D stage objects */
-    async getStageObjects() { return this.request('/session/stageobjects'); }
+    /** GET /session/transport/setlists — all set lists */
+    async getSetLists() { return this.request('/session/transport/setlists'); }
 
     // ================================================================
-    // MIXED REALITY / CAMERA TRACKING
+    // STATUS
     // ================================================================
 
-    /** GET /session/mrsets — mixed reality sets */
-    async getMRSets() { return this.request('/session/mrsets'); }
+    /** GET /session/status/health — machine health */
+    async getHealth() { return this.request('/session/status/health'); }
 
-    /** GET /session/cameratracking — camera tracking data */
-    async getCameraTracking() { return this.request('/session/cameratracking'); }
+    /** GET /session/status/notifications — system notifications */
+    async getNotifications() { return this.request('/session/status/notifications'); }
 
-    /** GET /session/trackinginputs — tracking system inputs */
-    async getTrackingInputs() { return this.request('/session/trackinginputs'); }
+    /** GET /session/status/project — project info */
+    async getProject() { return this.request('/session/status/project'); }
 
-    // ================================================================
-    // RENDER / OUTPUT CONTROL
-    // ================================================================
-
-    /** GET /session/outputassignments — output assignment configuration */
-    async getOutputAssignments() { return this.request('/session/outputassignments'); }
-
-    /** POST /session/outputs/{outputId}/enabled — toggle output enabled state */
-    async setOutputEnabled(outputId, enabled) { return this.request(`/session/outputs/${outputId}/enabled`, { method: 'POST', body: { enabled } }); }
-
-    /** GET /session/renderconfig — render configuration */
-    async getRenderConfig() { return this.request('/session/renderconfig'); }
-
-    /** POST /session/capture — capture a frame/screenshot from a machine */
-    async captureFrame(machineId) { return this.request('/session/capture', { method: 'POST', body: { machineId } }); }
+    /** GET /session/status/session — session config */
+    async getSession() { return this.request('/session/status/session'); }
 
     // ================================================================
-    // NOTIFICATIONS / EVENTS
+    // SEQUENCING (Indirections)
     // ================================================================
 
-    /** GET /session/notifications — system notifications and warnings */
-    async getNotifications() { return this.request('/session/notifications'); }
+    /** GET /session/sequencing/indirections — list indirections */
+    async getIndirections() { return this.request('/session/sequencing/indirections'); }
 
-    /** GET /session/health — detailed system health */
-    async getHealth() { return this.request('/session/health'); }
+    /** GET /session/sequencing/indirectionresources — resources for indirection */
+    async getIndirectionResources(uid) { return this.request(`/session/sequencing/indirectionresources?uid=${uid}`); }
 
-    // ================================================================
-    // NETWORK
-    // ================================================================
-
-    /** GET /session/networkadapters — network adapter configuration */
-    async getNetworkAdapters() { return this.request('/session/networkadapters'); }
-
-    /** GET /session/dmx/outputs — DMX universe output configuration */
-    async getDMXOutputs() { return this.request('/session/dmx/outputs'); }
-
-    /** POST /session/dmx/outputs — set a DMX channel value */
-    async setDMXValue(universe, channel, value) { return this.request('/session/dmx/outputs', { method: 'POST', body: { universe, channel, value } }); }
+    /** POST /session/sequencing/changeindirections — change indirections */
+    async changeIndirections(changes) { return this.request('/session/sequencing/changeindirections', { method: 'POST', body: changes }); }
 
     // ================================================================
-    // CONTENT / MEDIA
+    // NOTES
     // ================================================================
 
-    /** GET /session/content — content folder structure */
-    async getContentFolders() { return this.request('/session/content'); }
+    /** GET /session/notes — list all notes */
+    async getNotes(start, count) { return this.request(`/session/notes${start != null ? '?start=' + start + '&count=' + (count || 50) : ''}`); }
 
-    /** GET /session/videoinputs — NDI/SDI/capture video inputs */
-    async getVideoInputs() { return this.request('/session/videoinputs'); }
+    /** GET /session/note — get a note by uid or name */
+    async getNote(uid) { return this.request(`/session/note?uid=${uid}`); }
 
-    /** GET /session/audiodevices — audio device list */
-    async getAudioDevices() { return this.request('/session/audiodevices'); }
+    /** POST /session/note — create/update note */
+    async setNote(note) { return this.request('/session/note', { method: 'POST', body: note }); }
+
+    // ================================================================
+    // SOCKPUPPET (Live Parameter Control)
+    // ================================================================
+
+    /** GET /session/sockpuppet/patches — HTTP sockpuppet patches */
+    async getSockpuppetPatches() { return this.request('/session/sockpuppet/patches'); }
+
+    /** POST /session/sockpuppet/live — send live changes */
+    async sockpuppetLive(address, field, value) { return this.request('/session/sockpuppet/live', { method: 'POST', body: { address, field, value } }); }
+
+    // ================================================================
+    // COLOUR
+    // ================================================================
+
+    /** GET /session/colour/cdls — list CDLs */
+    async getCDLs() { return this.request('/session/colour/cdls'); }
+
+    /** POST /session/colour/cdl — set CDL */
+    async setCDL(cdl) { return this.request('/session/colour/cdl', { method: 'POST', body: cdl }); }
+
+    // ================================================================
+    // RENDERSTREAM
+    // ================================================================
+
+    /** GET /session/renderstream/layers — RenderStream layers */
+    async getRenderStreamLayers() { return this.request('/session/renderstream/layers'); }
+
+    /** GET /session/renderstream/layerstatus — layer status */
+    async getRenderStreamLayerStatus(uid) { return this.request(`/session/renderstream/layerstatus?uid=${uid}`); }
+
+    /** POST /session/renderstream/startlayers — start workload */
+    async startRenderStreamLayers(layers) { return this.request('/session/renderstream/startlayers', { method: 'POST', body: { layers } }); }
+
+    /** POST /session/renderstream/stoplayers — stop workload */
+    async stopRenderStreamLayers(layers) { return this.request('/session/renderstream/stoplayers', { method: 'POST', body: { layers } }); }
+
+    /** POST /session/renderstream/restartlayers — restart workload */
+    async restartRenderStreamLayers(layers) { return this.request('/session/renderstream/restartlayers', { method: 'POST', body: { layers } }); }
+
+    /** POST /session/renderstream/synclayers — sync workload */
+    async syncRenderStreamLayers(layers) { return this.request('/session/renderstream/synclayers', { method: 'POST', body: { layers } }); }
+
+    // ================================================================
+    // FAILOVER
+    // ================================================================
+
+    /** POST /session/failover/failovermachine — failover a machine */
+    async failoverMachine(machine) { return this.request('/session/failover/failovermachine', { method: 'POST', body: { machine } }); }
+
+    /** POST /session/failover/restoremachine — restore machine */
+    async restoreMachine(machine) { return this.request('/session/failover/restoremachine', { method: 'POST', body: { machine } }); }
+
+    /** GET /session/failover/settings — failover settings */
+    async getFailoverSettings() { return this.request('/session/failover/settings'); }
+
+    // ================================================================
+    // MIXED REALITY
+    // ================================================================
+
+    /** GET /session/mixedreality/cameras */
+    async getMRCameras() { return this.request('/session/mixedreality/cameras'); }
+
+    /** GET /session/mixedreality/mrsets */
+    async getMRSets() { return this.request('/session/mixedreality/mrsets'); }
+
+    // ================================================================
+    // SHOT RECORDER
+    // ================================================================
+
+    /** GET /session/shotrecorder/recorders */
+    async getShotRecorders() { return this.request('/session/shotrecorder/recorders'); }
+
+    /** POST /session/shotrecorder/record */
+    async shotRecord(engage, name, slate, take) { return this.request('/session/shotrecorder/record', { method: 'POST', body: { engage, name, slate, take } }); }
 
     // ================================================================
     // SHOW CONTROL
@@ -246,78 +266,95 @@ class DisguiseAPI {
     /** POST /session/transport/tcpstring — send TCP string command */
     async fireTCPString(command) { return this.request('/session/transport/tcpstring', { method: 'POST', body: { command } }); }
 
-    /** POST /session/tags/{tagName} — set show tag value */
-    async setTag(tagName, value) { return this.request(`/session/tags/${encodeURIComponent(tagName)}`, { method: 'POST', body: { value } }); }
-
-    /** GET /session/tags/{tagName} — get show tag value */
-    async getTag(tagName) { return this.request(`/session/tags/${encodeURIComponent(tagName)}`); }
-
-    /** GET /session/tags — all show tags */
-    async getTags() { return this.request('/session/tags'); }
-
-    /** POST /session/expressions/{exprName} — set expression value */
-    async setExpression(exprName, value) { return this.request(`/session/expressions/${encodeURIComponent(exprName)}`, { method: 'POST', body: { value } }); }
-
-    /** GET /session/expressions — all expressions */
-    async getExpressions() { return this.request('/session/expressions'); }
-
-    // ================================================================
-    // OSC CONTROL
-    // ================================================================
-
     /** POST /session/osc — send OSC message */
     async sendOSC(address, args) { return this.request('/session/osc', { method: 'POST', body: { address, args } }); }
 
     // ================================================================
-    // TIMELINE ENHANCED
+    // SYSTEM
     // ================================================================
 
-    /** GET /session/tracks/{trackId}/layers — track layers */
-    async getTrackLayers(trackId) { return this.request(`/session/tracks/${trackId}/layers`); }
+    /** GET /service/system/detectsystems — machines on network */
+    async detectSystems() { return this.request('/service/system/detectsystems'); }
 
-    /** PUT /session/tracks/{trackId}/opacity — set track opacity */
-    async setTrackOpacity(trackId, opacity) { return this.request(`/session/tracks/${trackId}/opacity`, { method: 'PUT', body: { opacity } }); }
+    // ================================================================
+    // ALIASES (for compatibility with app.js connectToServer/poll)
+    // ================================================================
 
-    /** GET /session/cues — cue/note list from timeline */
-    async getTimelineCues() { return this.request('/session/cues'); }
+    /** Alias — getTransportStatus → getActiveTransport */
+    async getTransportStatus() { return this.getActiveTransport(); }
 
-    /** POST /session/cues/{cueId}/activate — go to / activate cue */
-    async setCueActive(cueId) { return this.request(`/session/cues/${cueId}/activate`, { method: 'POST' }); }
+    /** Alias — getSections → getAnnotations (sections are annotations in d3) */
+    async getSections() { return this.getAnnotations(); }
+
+    /** Alias — getMachines → getHealth (machine health) */
+    async getMachines() { return this.getHealth(); }
+
+    // ================================================================
+    // COMPOSITE STATE (for Show Run)
+    // ================================================================
+
+    async getState() {
+        const [transport, tracks, annotations, health, project] = await Promise.all([
+            this.getActiveTransport().catch(() => ({})),
+            this.getTracks().catch(() => []),
+            this.getAnnotations().catch(() => []),
+            this.getHealth().catch(() => []),
+            this.getProject().catch(() => ({})),
+        ]);
+
+        // Parse transport state
+        const result = transport?.result || transport || {};
+        const trackList = Array.isArray(tracks?.result) ? tracks.result : (Array.isArray(tracks) ? tracks : []);
+        const annotList = Array.isArray(annotations?.result) ? annotations.result : (Array.isArray(annotations) ? annotations : []);
+        const healthList = Array.isArray(health?.result) ? health.result : (Array.isArray(health) ? health : []);
+
+        return {
+            transport: result,
+            tracks: trackList,
+            annotations: annotList,
+            health: healthList,
+            project: project?.result || project || {},
+            currentTrack: result.currentTrack || result.track || null,
+            currentSection: result.currentSection || result.section || null,
+            timecode: result.currentTime || result.timecode || '00:00:00:00',
+            isPlaying: result.playing === true || result.state === 'playing',
+            isPaused: result.state === 'paused',
+            engaged: result.engaged !== false,
+            volume: result.volume ?? 100,
+            brightness: result.brightness ?? 100,
+        };
+    }
 
     // ================================================================
     // HEALTH CHECK
     // ================================================================
     async healthCheck() {
         try {
-            const status = await this.getStatus();
+            const project = await this.getProject();
+            const health = await this.getHealth().catch(() => []);
             const tracks = await this.getTracks().catch(() => []);
-            const transport = await this.getTransportStatus().catch(() => ({}));
-            const sections = await this.getSections().catch(() => []);
-            const machines = await this.getMachines().catch(() => []);
-            const screens = await this.getScreens().catch(() => []);
-            const projectors = await this.getProjectors().catch(() => []);
+            const transport = await this.getActiveTransport().catch(() => ({}));
             const notifications = await this.getNotifications().catch(() => []);
+
+            const healthList = Array.isArray(health?.result) ? health.result : (Array.isArray(health) ? health : []);
+            const trackList = Array.isArray(tracks?.result) ? tracks.result : (Array.isArray(tracks) ? tracks : []);
+            const notifList = Array.isArray(notifications?.result) ? notifications.result : (Array.isArray(notifications) ? notifications : []);
+
             return {
                 ok: true,
                 info: {
-                    engineStatus: status.state || 'Running',
+                    engineStatus: 'Running',
                     computerName: 'Disguise',
                     product: 'Disguise d3',
-                    softwareVersion: status.softwareVersion || '',
-                    _status: { ...status, transport, machines },
-                    _tracks: tracks,
-                    _sections: sections,
-                    _screens: screens,
-                    _projectors: projectors,
-                    _notifications: notifications,
-                    tracks: Array.isArray(tracks) ? tracks.length : 0,
-                    screens: Array.isArray(screens) ? screens.length : 0,
-                    projectors: Array.isArray(projectors) ? projectors.length : 0,
-                    notificationSummary: Array.isArray(notifications) ? {
-                        total: notifications.length,
-                        errors: notifications.filter(n => n.severity === 'error' || n.level === 'error').length,
-                        warnings: notifications.filter(n => n.severity === 'warning' || n.level === 'warning').length,
-                    } : { total: 0, errors: 0, warnings: 0 },
+                    softwareVersion: (project?.result || project)?.version || '',
+                    _status: { project: project?.result || project, transport: transport?.result || transport, health: healthList },
+                    _tracks: trackList,
+                    tracks: trackList.length,
+                    notificationSummary: {
+                        total: notifList.length,
+                        errors: notifList.filter(n => n.severity === 'error' || n.level === 'error').length,
+                        warnings: notifList.filter(n => n.severity === 'warning' || n.level === 'warning').length,
+                    },
                 },
             };
         } catch (e) {

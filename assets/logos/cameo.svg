@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 60">
+  <!-- Cameo logo - lowercase bold with lizard icon -->
+  <!-- Stylized lizard icon -->
+  <g transform="translate(28, 18)" fill="#e8a035">
+    <ellipse cx="8" cy="12" rx="6" ry="9" />
+    <circle cx="8" cy="5" r="4" />
+    <circle cx="6" cy="4" r="1" fill="#1a1a1a"/>
+    <!-- Legs -->
+    <line x1="3" y1="8" x2="-3" y2="5" stroke="#e8a035" stroke-width="2" stroke-linecap="round"/>
+    <line x1="13" y1="8" x2="19" y2="5" stroke="#e8a035" stroke-width="2" stroke-linecap="round"/>
+    <line x1="3" y1="16" x2="-3" y2="20" stroke="#e8a035" stroke-width="2" stroke-linecap="round"/>
+    <line x1="13" y1="16" x2="19" y2="20" stroke="#e8a035" stroke-width="2" stroke-linecap="round"/>
+    <!-- Tail -->
+    <path d="M8 21 Q10 28 14 30" stroke="#e8a035" stroke-width="2" fill="none" stroke-linecap="round"/>
+  </g>
+  <!-- "cameo" text -->
+  <text x="120" y="38" font-family="'Segoe UI', 'Helvetica Neue', Arial, sans-serif" font-size="28" font-weight="700" fill="#ffffff" text-anchor="middle" letter-spacing="2">cameo</text>
+</svg>

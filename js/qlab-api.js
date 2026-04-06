@@ -125,6 +125,32 @@ class QlabAPI {
     }
 
     // ================================================================
+    // COMPOSITE STATE
+    // ================================================================
+    async getState() {
+        await this.connect();
+        const workspaces = await this.getWorkspaces().catch(() => []);
+        const wsList = Array.isArray(workspaces) ? workspaces : [];
+        const wsId = wsList[0]?.uniqueID || '';
+        let cues = [];
+        let currentCueId = null;
+        let masterVolume = 100;
+        let runningCues = [];
+        if (wsId) {
+            try {
+                const cueLists = await this.getCueList(wsId);
+                const lists = Array.isArray(cueLists) ? cueLists : [];
+                for (const list of lists) {
+                    if (Array.isArray(list.cues)) cues = cues.concat(list.cues);
+                }
+            } catch {}
+            try { const pos = await this.getPlaybackPosition(wsId); currentCueId = pos?.uniqueID || pos?.number; } catch {}
+            try { const rc = await this.getRunningCues(wsId); runningCues = Array.isArray(rc) ? rc : []; } catch {}
+        }
+        return { workspaceId: wsId, cues, currentCueId, masterVolume, runningCues };
+    }
+
+    // ================================================================
     // HEALTH CHECK
     // ================================================================
 

@@ -239,7 +239,7 @@ const OscRouterPage = {
             <!-- Recent from log -->
             <div class="osc-sender-card" style="margin-top:16px">
                 <h3 style="font-size:14px;font-weight:600;margin:0 0 12px 0"><i class="fas fa-history" style="margin-right:6px;color:var(--text-muted)"></i>Recent Messages</h3>
-                <div class="osc-recent-list">
+                <div class="osc-recent-list" id="osc-recent-messages">
                     ${this._log.length === 0 ? '<div style="color:var(--text-muted);font-size:12px;text-align:center;padding:16px">No messages sent yet.</div>' : ''}
                     ${this._log.slice(0, 10).map(entry => `
                         <div class="osc-recent-item" onclick="OscRouterPage._resend(${JSON.stringify(entry).replace(/"/g, '&quot;')})">
@@ -499,11 +499,28 @@ const OscRouterPage = {
             t.lastPing = Date.now();
         }
         this._saveTargets();
-        this._refreshContent();
+        // Only update the targets grid — don't re-render the whole view
+        // (re-rendering destroys argument fields in the message composer)
+        this._refreshTargetsOnly();
     },
 
     async _pingAll() {
         await Promise.allSettled(this._targets.map(t => this._pingTarget(t.id)));
+    },
+
+    _refreshTargetsOnly() {
+        // Update only the targets grid and summary stats without touching sender/routes/log
+        const grid = document.querySelector('.osc-grid');
+        if (grid) {
+            grid.innerHTML = this._targets.map(t => this._renderTargetCard(t)).join('');
+        }
+        // Update summary stats
+        const onlineCount = this._targets.filter(t => t.status === 'online').length;
+        const summaryVals = document.querySelectorAll('.osc-summary-card .osc-summary-val');
+        if (summaryVals.length >= 2) {
+            summaryVals[0].textContent = this._targets.length;
+            summaryVals[1].textContent = onlineCount;
+        }
     },
 
     // ============================================================
@@ -637,7 +654,8 @@ const OscRouterPage = {
 
         this._sendOSC(target.ip, target.port, address, args);
         this._addLogEntry(address, args, target, 'send');
-        this._refreshContent();
+        // Update recent messages list without destroying the form
+        this._refreshRecentMessages();
     },
 
     _quickSend(targetId) {
@@ -802,6 +820,24 @@ const OscRouterPage = {
     _refreshContent() {
         const el = document.getElementById('osc-content');
         if (el) el.innerHTML = this._renderView();
+    },
+
+    _refreshRecentMessages() {
+        const container = document.getElementById('osc-recent-messages');
+        if (!container) return;
+        const recent = this._log.slice(0, 10);
+        if (recent.length === 0) {
+            container.innerHTML = '<div style="color:var(--text-muted);font-size:12px;padding:12px;text-align:center">No messages sent yet</div>';
+        } else {
+            container.innerHTML = recent.map(entry => `
+                <div style="display:flex;align-items:center;gap:8px;padding:6px 8px;border-bottom:1px solid var(--border);font-size:11px;">
+                    <span class="mono" style="color:var(--accent);flex:1">${UI.esc(entry.address)}</span>
+                    <span style="font-size:10px;color:var(--text-muted)">${UI.esc(entry.targetName || '')}</span>
+                    <span style="font-size:10px;color:var(--text-muted)">${UI.esc(this._formatArgs(entry.args))}</span>
+                    <button class="btn btn-sm" style="padding:1px 6px;font-size:9px" onclick="OscRouterPage._resend(OscRouterPage._log[${this._log.indexOf(entry)}])"><i class="fas fa-redo"></i></button>
+                </div>
+            `).join('');
+        }
     },
 
     _setView(view) {

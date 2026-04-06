@@ -1,6 +1,7 @@
 /**
- * Network Configuration Page — All protocol settings
- * Art-Net, sACN, HippoNet, OSC, MIDI, TCP/IP, CITP, General
+ * Protocol Configuration Page — Show control protocol settings
+ * Art-Net, sACN, OSC, MIDI, TCP/IP, CITP, MA-Net
+ * (General network & HippoNet/Cluster moved to Settings)
  */
 const NetworkPage = {
     render() {
@@ -8,13 +9,14 @@ const NetworkPage = {
 
         return `
             <div class="section-header">
-                <h2><i class="fas fa-network-wired"></i> Network Configuration</h2>
-                <button class="btn btn-sm btn-primary" onclick="NetworkPage.saveAll()"><i class="fas fa-save"></i> Save All</button>
+                <h2><i class="fas fa-sliders-h"></i> Protocol Configuration</h2>
+                <div class="flex gap-sm">
+                    <button class="btn btn-sm btn-primary" onclick="NetworkPage.saveAll()"><i class="fas fa-save"></i> Save All</button>
+                    <span style="font-size:10px;color:var(--text-muted);align-self:center;">Network & Cluster settings moved to <a href="#" onclick="HippoApp.navigate('settings');SettingsPage.showSection('network');return false;" style="color:var(--accent);">Settings</a></span>
+                </div>
             </div>
 
             ${UI.tabs([
-                { id: 'general', label: 'General', content: this._generalTab(cfg.general) },
-                { id: 'hipponet', label: 'HippoNet', content: this._hipponetTab(cfg.hipponet) },
                 { id: 'artnet', label: 'Art-Net', content: this._artnetTab(cfg.artnet) },
                 { id: 'sacn', label: 'sACN', content: this._sacnTab(cfg.sacn) },
                 { id: 'osc', label: 'OSC', content: this._oscTab(cfg.osc) },
@@ -22,63 +24,7 @@ const NetworkPage = {
                 { id: 'tcp', label: 'TCP/IP', content: this._tcpTab(cfg.tcp) },
                 { id: 'citp', label: 'CITP', content: this._citpTab(cfg.citp) },
                 { id: 'manet', label: 'MA-Net', content: this._manetTab(cfg.manet) },
-            ], 'general')}
-        `;
-    },
-
-    _generalTab(g) {
-        return `
-            <div class="network-grid">
-                <div class="card">
-                    <div class="card-header"><h3><i class="fas fa-globe"></i> Network Interfaces</h3></div>
-                    <div class="card-body">
-                        ${UI.formGroup('HOSTNAME', `<input class="form-control" id="net-hostname" value="${UI.esc(g.hostname)}" placeholder="Auto-detect">`)}
-                        ${UI.formGroup('PRIMARY INTERFACE', UI.select('net-primary-iface', [{value:'auto',label:'Auto-detect'},{value:'eth0',label:'eth0'},{value:'eth1',label:'eth1'}], g.primaryInterface))}
-                        ${UI.formGroup('MTU SIZE', `<input class="form-control" type="number" id="net-mtu" value="${g.mtu}" min="576" max="9000">`, 'Default: 1500. Use 9000 for jumbo frames')}
-                        ${UI.formGroup('QOS PRIORITY', UI.select('net-qos', ['normal','high','realtime'], g.qos))}
-                        ${UI.formGroup('BANDWIDTH LIMIT (MBPS)', `<input class="form-control" type="number" id="net-bw" value="${g.bandwidthLimit}" min="0">`, '0 = unlimited')}
-                    </div>
-                </div>
-                <div class="card">
-                    <div class="card-header"><h3><i class="fas fa-clock"></i> Time Sync</h3></div>
-                    <div class="card-body">
-                        <div class="form-inline mb-md">
-                            <span style="font-size:12px">NTP Enabled</span>
-                            ${UI.toggle('net-ntp-enabled', g.ntpEnabled)}
-                        </div>
-                        ${UI.formGroup('NTP SERVER', `<input class="form-control mono" id="net-ntp-server" value="${UI.esc(g.ntpServer)}">`)}
-                    </div>
-                </div>
-            </div>
-        `;
-    },
-
-    _hipponetTab(h) {
-        return `
-            <div class="network-grid">
-                <div class="card full-width">
-                    <div class="card-header">
-                        <h3><i class="fas fa-project-diagram"></i> HippoNet</h3>
-                        <div class="form-inline">${UI.toggle('hn-enabled', h.enabled)} <span style="font-size:11px">Enabled</span></div>
-                    </div>
-                    <div class="card-body">
-                        <div class="form-row">
-                            ${UI.formGroup('INTERFACE', UI.select('hn-iface', [{value:'auto',label:'Auto'},{value:'eth0',label:'eth0'},{value:'eth1',label:'eth1'}], h.interface))}
-                            ${UI.formGroup('PORT', `<input class="form-control" type="number" id="hn-port" value="${h.port}" min="1" max="65535">`)}
-                            ${UI.formGroup('MAX NODES', `<input class="form-control" type="number" id="hn-maxnodes" value="${h.maxNodes}" min="1" max="256">`)}
-                        </div>
-                        <div class="form-row">
-                            ${UI.formGroup('MASTER IP', `<input class="form-control mono" id="hn-master" value="${UI.esc(h.masterIp)}" placeholder="Auto-elect">`, 'Leave empty for auto-election')}
-                            ${UI.formGroup('HEARTBEAT (S)', `<input class="form-control" type="number" id="hn-heartbeat" value="${h.heartbeat}" min="1">`)}
-                            ${UI.formGroup('TIMEOUT (S)', `<input class="form-control" type="number" id="hn-timeout" value="${h.timeout}" min="5">`)}
-                        </div>
-                        <div class="flex gap-md mt-sm">
-                            <div class="form-inline">${UI.toggle('hn-discovery', h.discovery)} <span style="font-size:11px">Auto Discovery</span></div>
-                            <div class="form-inline">${UI.toggle('hn-sync', h.syncEnabled)} <span style="font-size:11px">Sync Enabled</span></div>
-                        </div>
-                    </div>
-                </div>
-            </div>
+            ], 'artnet')}
         `;
     },
 
@@ -285,26 +231,6 @@ const NetworkPage = {
     saveAll() {
         const cfg = appState.get('networkConfig');
 
-        // General
-        cfg.general.hostname = this._val('net-hostname', cfg.general.hostname);
-        cfg.general.primaryInterface = this._sel('net-primary-iface', cfg.general.primaryInterface);
-        cfg.general.mtu = this._num('net-mtu', cfg.general.mtu);
-        cfg.general.qos = this._sel('net-qos', cfg.general.qos);
-        cfg.general.bandwidthLimit = this._num('net-bw', cfg.general.bandwidthLimit);
-        cfg.general.ntpEnabled = this._chk('net-ntp-enabled');
-        cfg.general.ntpServer = this._val('net-ntp-server', cfg.general.ntpServer);
-
-        // HippoNet
-        cfg.hipponet.enabled = this._chk('hn-enabled');
-        cfg.hipponet.interface = this._sel('hn-iface', cfg.hipponet.interface);
-        cfg.hipponet.port = this._num('hn-port', cfg.hipponet.port);
-        cfg.hipponet.maxNodes = this._num('hn-maxnodes', cfg.hipponet.maxNodes);
-        cfg.hipponet.masterIp = this._val('hn-master', cfg.hipponet.masterIp);
-        cfg.hipponet.heartbeat = this._num('hn-heartbeat', cfg.hipponet.heartbeat);
-        cfg.hipponet.timeout = this._num('hn-timeout', cfg.hipponet.timeout);
-        cfg.hipponet.discovery = this._chk('hn-discovery');
-        cfg.hipponet.syncEnabled = this._chk('hn-sync');
-
         // Art-Net
         cfg.artnet.enabled = this._chk('artnet-enabled');
         cfg.artnet.mode = this._sel('artnet-mode', cfg.artnet.mode);
@@ -382,8 +308,8 @@ const NetworkPage = {
         cfg.manet.interface = this._sel('manet-iface', cfg.manet.interface);
 
         appState.setNetworkConfig(cfg);
-        UI.toast('Network settings saved', 'success');
-        appState.log('INFO', 'Network configuration saved', 'Network');
+        UI.toast('Protocol settings saved', 'success');
+        appState.log('INFO', 'Protocol configuration saved', 'Network');
     },
 
     onActivate() {},

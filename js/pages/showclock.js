@@ -42,6 +42,8 @@ const ShowClockPage = {
     _TIMERS_KEY: 'luxor_show_timers',
     _SCHEDULE_KEY: 'luxor_show_schedule',
     _THEME_KEY: 'luxor_showclock_theme',
+    _SW_KEY: 'luxor_show_stopwatch',
+    _BREAK_KEY: 'luxor_show_break',
 
     // ----------------------------------------------------------------
     // Lifecycle
@@ -227,6 +229,31 @@ const ShowClockPage = {
             const th = localStorage.getItem(this._THEME_KEY);
             if (th) this._theme = th;
         } catch (_) {}
+        // Restore stopwatch
+        try {
+            const sw = JSON.parse(localStorage.getItem(this._SW_KEY));
+            if (sw) {
+                this._swLaps = sw.laps || [];
+                if (sw.running && sw.absStart) {
+                    // Was running — resume from absolute timestamp
+                    this._swRunning = true;
+                    this._swElapsed = sw.elapsed || 0;
+                    this._swStartTime = performance.now() - (Date.now() - sw.absStart);
+                } else {
+                    this._swRunning = false;
+                    this._swElapsed = sw.elapsed || 0;
+                    this._swStartTime = 0;
+                }
+            }
+        } catch (_) {}
+        // Restore break timer
+        try {
+            const br = JSON.parse(localStorage.getItem(this._BREAK_KEY));
+            if (br && br.end) {
+                this._breakEnd = br.end;
+                this._breakDuration = br.duration || 0;
+            }
+        } catch (_) {}
     },
 
     _saveTimers() {
@@ -235,6 +262,24 @@ const ShowClockPage = {
 
     _saveSchedule() {
         localStorage.setItem(this._SCHEDULE_KEY, JSON.stringify(this._schedule));
+    },
+
+    _saveStopwatch() {
+        const data = {
+            running: this._swRunning,
+            elapsed: this._swRunning ? this._swElapsed + (performance.now() - this._swStartTime) : this._swElapsed,
+            absStart: this._swRunning ? Date.now() : null,
+            laps: this._swLaps,
+        };
+        localStorage.setItem(this._SW_KEY, JSON.stringify(data));
+    },
+
+    _saveBreak() {
+        if (this._breakEnd) {
+            localStorage.setItem(this._BREAK_KEY, JSON.stringify({ end: this._breakEnd, duration: this._breakDuration }));
+        } else {
+            localStorage.removeItem(this._BREAK_KEY);
+        }
     },
 
     // ----------------------------------------------------------------
@@ -255,12 +300,189 @@ const ShowClockPage = {
     // Full Screen
     // ----------------------------------------------------------------
     _toggleFullscreen() {
-        const el = document.getElementById('sc-clock-card');
-        if (!el) return;
         if (!document.fullscreenElement) {
-            el.requestFullscreen().catch(() => UI.toast('Fullscreen not supported', 'warning'));
+            // Build a fullscreen overlay with all running info
+            let overlay = document.getElementById('sc-fs-overlay');
+            if (!overlay) {
+                overlay = document.createElement('div');
+                overlay.id = 'sc-fs-overlay';
+                overlay.className = 'sc-fs-overlay ' + this._themeClass();
+                overlay.innerHTML = `
+                    <div class="sc-fs-exit" onclick="document.exitFullscreen()" title="Exit Full Screen"><i class="fas fa-compress"></i></div>
+                    <div class="sc-fs-main">
+                        <div class="sc-main-time" id="sc-fs-time">00:00:00</div>
+                        <div class="sc-main-date" id="sc-fs-date"></div>
+                    </div>
+                    <div class="sc-fs-panels" id="sc-fs-panels"></div>
+                `;
+                document.body.appendChild(overlay);
+            }
+            overlay.className = 'sc-fs-overlay ' + this._themeClass();
+            this._updateFsPanels();
+            overlay.requestFullscreen().catch(() => UI.toast('Fullscreen not supported', 'warning'));
+
+            // Listen for exit
+            const onFsChange = () => {
+                if (!document.fullscreenElement) {
+                    const ov = document.getElementById('sc-fs-overlay');
+                    if (ov) ov.remove();
+                    document.removeEventListener('fullscreenchange', onFsChange);
+                }
+            };
+            document.addEventListener('fullscreenchange', onFsChange);
         } else {
             document.exitFullscreen();
+        }
+    },
+
+    _updateFsPanels() {
+        const container = document.getElementById('sc-fs-panels');
+        if (!container) return;
+
+        let panels = '';
+
+        // Countdown timers
+        if (this._timers.length > 0) {
+            const now = new Date();
+            const nowSec = now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
+            panels += '<div class="sc-fs-section">';
+            this._timers.forEach(t => {
+                const parts = t.target.split(':').map(Number);
+                const targetSec = parts[0] * 3600 + parts[1] * 60 + parts[2];
+                let diff = targetSec - nowSec;
+                let display, isShowtime = false, isWarning = false;
+                if (diff <= 0) {
+                    display = 'SHOW TIME';
+                    isShowtime = true;
+                } else {
+                    const h = String(Math.floor(diff / 3600)).padStart(2, '0');
+                    const m = String(Math.floor((diff % 3600) / 60)).padStart(2, '0');
+                    const s = String(diff % 60).padStart(2, '0');
+                    display = `${h}:${m}:${s}`;
+                    if (diff < 300) isWarning = true;
+                }
+                panels += `<div class="sc-fs-timer-item ${isWarning ? 'sc-fs-warning' : ''}" style="border-color:${UI.esc(t.color)}">
+                    <div class="sc-fs-timer-label" style="color:${UI.esc(t.color)}">${UI.esc(t.name)}</div>
+                    <div class="sc-fs-timer-value ${isShowtime ? 'sc-showtime' : ''}" id="sc-fs-tcd-${UI.esc(t.id)}">${display}</div>
+                </div>`;
+            });
+            panels += '</div>';
+        }
+
+        // Stopwatch (if running or has elapsed time)
+        if (this._swRunning || this._swElapsed > 0) {
+            let totalMs = this._swRunning ? this._swElapsed + (performance.now() - this._swStartTime) : this._swElapsed;
+            panels += `<div class="sc-fs-section">
+                <div class="sc-fs-timer-item" style="border-color:var(--accent)">
+                    <div class="sc-fs-timer-label" style="color:var(--accent)">Stopwatch</div>
+                    <div class="sc-fs-timer-value" id="sc-fs-sw" style="color:var(--accent)">${this._formatMs(totalMs)}</div>
+                </div>
+            </div>`;
+        }
+
+        // Break timer (if active)
+        if (this._breakEnd) {
+            const remaining = this._breakEnd - Date.now();
+            let display, isWarning = false;
+            if (remaining <= 0) {
+                display = 'BREAK OVER';
+                isWarning = true;
+            } else {
+                const totalSec = Math.ceil(remaining / 1000);
+                const m = String(Math.floor(totalSec / 60)).padStart(2, '0');
+                const s = String(totalSec % 60).padStart(2, '0');
+                display = `${m}:${s}`;
+                if (remaining < 60000) isWarning = true;
+            }
+            panels += `<div class="sc-fs-section">
+                <div class="sc-fs-timer-item ${isWarning ? 'sc-fs-warning' : ''}" style="border-color:#ff9f43">
+                    <div class="sc-fs-timer-label" style="color:#ff9f43"><i class="fas fa-mug-hot"></i> Break</div>
+                    <div class="sc-fs-timer-value ${isWarning ? 'sc-break-warning' : ''}" id="sc-fs-break">${display}</div>
+                </div>
+            </div>`;
+        }
+
+        // Day Schedule
+        if (this._schedule.length > 0) {
+            const now = new Date();
+            const nowStr = String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
+            const sorted = [...this._schedule].sort((a, b) => a.time.localeCompare(b.time));
+            panels += '<div class="sc-fs-schedule" id="sc-fs-schedule">';
+            panels += '<div class="sc-fs-schedule-title"><i class="fas fa-calendar-day"></i> Schedule</div>';
+            sorted.forEach((item, i) => {
+                const isPast = item.time <= nowStr;
+                const isCurrent = i < sorted.length - 1
+                    ? (nowStr >= item.time && nowStr < sorted[i + 1].time)
+                    : nowStr >= item.time;
+                panels += `<div class="sc-fs-sched-item ${isPast ? 'sc-fs-sched-past' : ''} ${isCurrent ? 'sc-fs-sched-current' : ''}">
+                    <span class="sc-fs-sched-time">${UI.esc(item.time)}</span>
+                    <span class="sc-fs-sched-desc">${UI.esc(item.description)}</span>
+                </div>`;
+            });
+            panels += '</div>';
+        }
+
+        container.innerHTML = panels;
+    },
+
+    _updateFsDOM() {
+        // Update fullscreen overlay time
+        const timeEl = document.getElementById('sc-fs-time');
+        const dateEl = document.getElementById('sc-fs-date');
+        if (!timeEl) return;
+        const now = new Date();
+        const h = String(now.getHours()).padStart(2, '0');
+        const m = String(now.getMinutes()).padStart(2, '0');
+        const s = String(now.getSeconds()).padStart(2, '0');
+        timeEl.textContent = `${h}:${m}:${s}`;
+        if (dateEl) {
+            dateEl.textContent = now.toLocaleDateString(undefined, {
+                weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+            });
+        }
+
+        // Update countdown timers in FS
+        const nowSec = now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
+        this._timers.forEach(t => {
+            const el = document.getElementById('sc-fs-tcd-' + t.id);
+            if (!el) return;
+            const parts = t.target.split(':').map(Number);
+            const targetSec = parts[0] * 3600 + parts[1] * 60 + parts[2];
+            let diff = targetSec - nowSec;
+            if (diff <= 0) {
+                el.textContent = 'SHOW TIME';
+                el.classList.add('sc-showtime');
+            } else {
+                el.classList.remove('sc-showtime');
+                el.textContent = `${String(Math.floor(diff / 3600)).padStart(2, '0')}:${String(Math.floor((diff % 3600) / 60)).padStart(2, '0')}:${String(diff % 60).padStart(2, '0')}`;
+            }
+        });
+
+        // Update stopwatch in FS
+        const swEl = document.getElementById('sc-fs-sw');
+        if (swEl) {
+            let totalMs = this._swRunning ? this._swElapsed + (performance.now() - this._swStartTime) : this._swElapsed;
+            swEl.textContent = this._formatMs(totalMs);
+        }
+
+        // Update break timer in FS
+        const breakEl = document.getElementById('sc-fs-break');
+        if (breakEl && this._breakEnd) {
+            const remaining = this._breakEnd - Date.now();
+            if (remaining <= 0) {
+                breakEl.textContent = 'BREAK OVER';
+                breakEl.classList.add('sc-break-warning');
+            } else {
+                const totalSec = Math.ceil(remaining / 1000);
+                breakEl.textContent = `${String(Math.floor(totalSec / 60)).padStart(2, '0')}:${String(totalSec % 60).padStart(2, '0')}`;
+            }
+        }
+
+        // Update schedule highlight in FS (once per minute)
+        const fsSchedule = document.getElementById('sc-fs-schedule');
+        if (fsSchedule && this._lastFsScheduleMin !== now.getMinutes()) {
+            this._lastFsScheduleMin = now.getMinutes();
+            this._updateFsPanels();
         }
     },
 
@@ -286,6 +508,7 @@ const ShowClockPage = {
             this._updateStopwatchDOM();
             this._updateBreakDOM();
             this._updateScheduleIndicator();
+            this._updateFsDOM();
             this._rafId = requestAnimationFrame(tick);
         };
         this._rafId = requestAnimationFrame(tick);
@@ -469,6 +692,7 @@ const ShowClockPage = {
             this._swRunning = true;
         }
         this._updateSwButtons();
+        this._saveStopwatch();
     },
 
     _swLap() {
@@ -477,6 +701,7 @@ const ShowClockPage = {
         this._swLaps.push(total);
         const container = document.getElementById('sc-sw-laps');
         if (container) container.innerHTML = this._renderLaps();
+        this._saveStopwatch();
     },
 
     _swReset() {
@@ -489,6 +714,7 @@ const ShowClockPage = {
         if (display) display.textContent = '00:00:00.0';
         const container = document.getElementById('sc-sw-laps');
         if (container) container.innerHTML = '';
+        this._saveStopwatch();
     },
 
     _updateSwButtons() {
@@ -542,12 +768,14 @@ const ShowClockPage = {
     _startBreak(minutes) {
         this._breakDuration = minutes * 60 * 1000;
         this._breakEnd = Date.now() + this._breakDuration;
+        this._saveBreak();
         UI.toast(`${minutes} minute break started`, 'success');
     },
 
     _cancelBreak() {
         this._breakEnd = null;
         this._breakDuration = 0;
+        this._saveBreak();
         const display = document.getElementById('sc-break-display');
         if (display) {
             display.textContent = 'No Break';
@@ -683,15 +911,6 @@ const ShowClockPage = {
     min-height: 180px;
     transition: background 0.3s;
 }
-.sc-clock-card:fullscreen {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    padding: 0;
-    border: none;
-    border-radius: 0;
-}
 .sc-main-time {
     font-family: 'Courier New', Courier, monospace;
     font-size: clamp(60px, 12vw, 120px);
@@ -702,10 +921,11 @@ const ShowClockPage = {
     transition: color 0.3s, text-shadow 0.3s;
 }
 .sc-main-date {
-    margin-top: 8px;
-    font-size: 16px;
-    letter-spacing: 0.05em;
-    opacity: 0.6;
+    margin-top: 10px;
+    font-size: 20px;
+    font-weight: 500;
+    letter-spacing: 0.04em;
+    opacity: 0.75;
     transition: color 0.3s;
 }
 
@@ -912,6 +1132,131 @@ const ShowClockPage = {
     font-size: 11px;
     color: var(--text-muted, #888);
 }
+
+/* ---- Fullscreen Overlay ---- */
+.sc-fs-overlay {
+    position: fixed;
+    inset: 0;
+    background: #000;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 99999;
+    gap: 24px;
+    padding: 40px;
+}
+.sc-fs-exit {
+    position: absolute;
+    top: 16px;
+    right: 20px;
+    color: rgba(255,255,255,0.3);
+    font-size: 20px;
+    cursor: pointer;
+    padding: 8px 12px;
+    border-radius: 8px;
+    transition: color 0.2s, background 0.2s;
+    z-index: 10;
+}
+.sc-fs-exit:hover { color: #fff; background: rgba(255,255,255,0.08); }
+.sc-fs-main { text-align: center; }
+.sc-fs-panels {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    justify-content: center;
+    max-width: 100%;
+    width: 100%;
+    padding: 0 20px;
+}
+.sc-fs-section {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    justify-content: center;
+}
+.sc-fs-timer-item {
+    background: rgba(255,255,255,0.04);
+    border: 2px solid rgba(255,255,255,0.15);
+    border-radius: 12px;
+    padding: 16px 28px;
+    text-align: center;
+    min-width: 180px;
+    transition: border-color 0.3s, box-shadow 0.3s;
+}
+.sc-fs-timer-label {
+    font-size: 13px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 6px;
+}
+.sc-fs-timer-value {
+    font-family: 'Courier New', Courier, monospace;
+    font-size: clamp(28px, 5vw, 48px);
+    font-weight: 700;
+    color: #ffffff;
+    letter-spacing: 0.04em;
+}
+.sc-fs-warning {
+    border-color: #ff3333 !important;
+    box-shadow: 0 0 20px rgba(255,51,51,0.3);
+    animation: sc-flash-border 1s ease-in-out infinite;
+}
+.sc-fs-warning .sc-fs-timer-value {
+    color: #ff3333;
+}
+
+/* ---- Fullscreen Schedule ---- */
+.sc-fs-schedule {
+    width: 100%;
+    max-width: 600px;
+    margin-top: 8px;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 12px;
+    padding: 14px 18px;
+    text-align: left;
+}
+.sc-fs-schedule-title {
+    font-size: 13px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: rgba(255,255,255,0.5);
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.sc-fs-sched-item {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 6px 8px;
+    border-radius: 6px;
+    transition: background 0.2s;
+}
+.sc-fs-sched-time {
+    font-family: 'Courier New', monospace;
+    font-size: 16px;
+    font-weight: 600;
+    color: rgba(255,255,255,0.85);
+    min-width: 55px;
+}
+.sc-fs-sched-desc {
+    font-size: 14px;
+    color: rgba(255,255,255,0.65);
+}
+.sc-fs-sched-current {
+    background: rgba(0,212,255,0.1);
+    border-left: 3px solid var(--accent, #00d4ff);
+    padding-left: 11px;
+}
+.sc-fs-sched-current .sc-fs-sched-time { color: var(--accent, #00d4ff); }
+.sc-fs-sched-current .sc-fs-sched-desc { color: rgba(255,255,255,0.9); }
+.sc-fs-sched-past .sc-fs-sched-time { color: rgba(255,255,255,0.3); text-decoration: line-through; }
+.sc-fs-sched-past .sc-fs-sched-desc { color: rgba(255,255,255,0.3); text-decoration: line-through; }
 
 /* ---- Utility ---- */
 .btn-xs {

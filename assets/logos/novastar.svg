@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 60">
+  <defs>
+    <linearGradient id="novaGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#2d7dc4"/>
+      <stop offset="100%" stop-color="#5ba8e6"/>
+    </linearGradient>
+  </defs>
+  <!-- "NOVA" in blue gradient -->
+  <text x="68" y="38" font-family="'Segoe UI', 'Helvetica Neue', Arial, sans-serif" font-size="26" font-weight="700" fill="url(#novaGrad)" text-anchor="end" letter-spacing="2">NOVA</text>
+  <!-- Green oval ring between words -->
+  <ellipse cx="82" cy="30" rx="6" ry="8" fill="none" stroke="#8cc63f" stroke-width="2.5"/>
+  <!-- "STAR" in gray -->
+  <text x="96" y="38" font-family="'Segoe UI', 'Helvetica Neue', Arial, sans-serif" font-size="26" font-weight="700" fill="#888888" text-anchor="start" letter-spacing="2">STAR</text>
+</svg>

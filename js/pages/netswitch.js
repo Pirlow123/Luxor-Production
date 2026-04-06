@@ -14,7 +14,7 @@ const NetSwitchPage = {
     // Device models
     _models: {
         gigacore: ['GigaCore 10', 'GigaCore 12', 'GigaCore 14R', 'GigaCore 16t', 'GigaCore 16Xt', 'GigaCore 16RFO', 'GigaCore 26i', 'GigaCore 30i'],
-        luminode: ['LumiNode 1', 'LumiNode 2', 'LumiNode 4', 'LumiNode 12', 'LumiNode MX40'],
+        luminode: ['LumiNode 1', 'LumiNode 2', 'LumiNode 4', 'LumiNode 12'],
         cameo: ['XNode 4', 'XNode 8'],
     },
 
@@ -134,14 +134,16 @@ const NetSwitchPage = {
             const sel = s.id === this._selectedId;
             const dot = s.connected ? 'var(--green)' : 'var(--red)';
             const typeLabel = s.type === 'luminode' ? 'LumiNode' : s.type === 'cameo' ? 'Cameo' : 'GigaCore';
+            const brandLogo = s.type === 'cameo' ? 'assets/logos/cameo.svg' : 'assets/logos/luminex.svg';
             return `
                 <div class="ptz-cam-card ${sel ? 'selected' : ''}" onclick="NetSwitchPage.selectSwitch('${s.id}')">
                     <div class="flex" style="align-items:center;gap:8px">
-                        <div style="width:8px;height:8px;border-radius:50%;background:${dot};flex-shrink:0"></div>
+                        <img src="${brandLogo}" style="width:20px;height:20px;object-fit:contain;flex-shrink:0;border-radius:3px;" alt="${typeLabel}">
                         <div style="flex:1;min-width:0">
                             <div style="font-weight:600;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${UI.esc(s.name)}</div>
                             <div style="font-size:10px;color:var(--text-muted)">${typeLabel} ${UI.esc(s.model)} &bull; ${UI.esc(s.ip)}</div>
                         </div>
+                        <div style="width:8px;height:8px;border-radius:50%;background:${dot};flex-shrink:0"></div>
                         <button class="btn-icon" onclick="event.stopPropagation();NetSwitchPage.removeSwitch('${s.id}')" title="Remove"><i class="fas fa-times" style="font-size:10px"></i></button>
                     </div>
                 </div>`;
@@ -168,6 +170,10 @@ const NetSwitchPage = {
         const vlans = st.vlans || [];
         const isLumiNode = sw.type === 'luminode';
 
+        const webOnly = sw._webOnlyMode && sw.connected && !sw.virtual;
+        const dataAvail = sw._dataAvailable || {};
+        const hasLimitedData = sw.connected && !sw.virtual && Object.keys(dataAvail).length > 0 && !dataAvail.ports;
+
         return `
         <!-- Status Bar -->
         <div class="ptz-status-bar">
@@ -175,12 +181,22 @@ const NetSwitchPage = {
                 <span style="font-weight:700;font-size:14px">${UI.esc(sw.name)}</span>
                 <span class="badge ${sw.connected ? 'badge-success' : 'badge-danger'}">${sw.connected ? 'CONNECTED' : 'OFFLINE'}</span>
                 <span class="badge" style="background:var(--bg-tertiary)">${sw.type === 'luminode' ? 'LumiNode' : 'GigaCore'} ${UI.esc(sw.model)}</span>
+                ${webOnly ? '<span class="badge" style="background:rgba(245,158,11,0.15);color:#f59e0b">WEB ONLY</span>' : ''}
             </div>
             <div class="flex gap-sm">
                 <button class="btn btn-sm" onclick="NetSwitchPage.refreshSwitch('${sw.id}')"><i class="fas fa-sync-alt"></i> Refresh</button>
                 <button class="btn btn-sm btn-danger" onclick="NetSwitchPage.rebootSwitch('${sw.id}')"><i class="fas fa-power-off"></i> Reboot</button>
             </div>
         </div>
+
+        ${webOnly || hasLimitedData ? `
+        <div style="background:linear-gradient(135deg,rgba(245,158,11,0.08),rgba(245,158,11,0.03));border:1px solid rgba(245,158,11,0.25);border-radius:var(--radius-md);padding:10px 14px;margin-bottom:8px;display:flex;align-items:center;gap:10px">
+            <i class="fas fa-info-circle" style="color:#f59e0b;font-size:14px;flex-shrink:0"></i>
+            <span style="font-size:11px;color:var(--text-secondary)">
+                Connected via web interface — some management features may not be available through the REST API.
+                <a href="http://${UI.esc(sw.ip)}" target="_blank" style="color:#f59e0b;text-decoration:underline;margin-left:4px">Open device web UI</a>
+            </span>
+        </div>` : ''}
 
         <div class="dashboard-panels" style="gap:12px">
 
@@ -232,7 +248,11 @@ const NetSwitchPage = {
             <div class="card">
                 <div class="card-header"><h3><i class="fas fa-bolt"></i> PoE Status</h3></div>
                 <div class="card-body">
-                    ${this._renderPoE(poe, ports)}
+                    ${isLumiNode && !dataAvail.poe ? `
+                    <div class="text-muted" style="text-align:center;padding:12px;font-size:11px">
+                        <i class="fas fa-info-circle" style="margin-right:4px"></i>
+                        PoE is not supported on this model.
+                    </div>` : this._renderPoE(poe, ports)}
                 </div>
             </div>
 
@@ -240,10 +260,14 @@ const NetSwitchPage = {
             <div class="card">
                 <div class="card-header">
                     <h3><i class="fas fa-project-diagram"></i> VLANs</h3>
-                    <button class="btn btn-sm" onclick="NetSwitchPage.showAddVlan('${sw.id}')"><i class="fas fa-plus"></i> Add</button>
+                    ${!(isLumiNode && !dataAvail.vlans) ? `<button class="btn btn-sm" onclick="NetSwitchPage.showAddVlan('${sw.id}')"><i class="fas fa-plus"></i> Add</button>` : ''}
                 </div>
                 <div class="card-body">
-                    ${this._renderVlans(vlans)}
+                    ${isLumiNode && !dataAvail.vlans && vlans.length === 0 ? `
+                    <div class="text-muted" style="text-align:center;padding:12px;font-size:11px">
+                        <i class="fas fa-info-circle" style="margin-right:4px"></i>
+                        VLAN management is not supported on this model.
+                    </div>` : this._renderVlans(vlans)}
                 </div>
             </div>
 
@@ -251,6 +275,12 @@ const NetSwitchPage = {
             <div class="card">
                 <div class="card-header"><h3><i class="fas fa-sitemap"></i> Network Protocols</h3></div>
                 <div class="card-body">
+                    ${isLumiNode && !dataAvail.vlans && !st.igmp?.enabled && !st.stp?.enabled ? `
+                    <div class="text-muted" style="text-align:center;padding:12px;font-size:11px">
+                        <i class="fas fa-info-circle" style="margin-right:4px"></i>
+                        IGMP, STP, and multicast management are not supported on this model.<br>
+                        Use the <a href="http://${UI.esc(sw.ip)}" target="_blank" style="color:var(--accent);text-decoration:underline">device web UI</a> for advanced network settings.
+                    </div>` : `
                     <table class="ledcalc-input-table">
                         <tr>
                             <td class="text-muted">IGMP Snooping</td>
@@ -274,7 +304,7 @@ const NetSwitchPage = {
                             <td class="text-muted">Multicast Filtering</td>
                             <td><span style="color:var(--green)">${st.multicast?.filtering ? 'Active' : 'Inactive'}</span></td>
                         </tr>
-                    </table>
+                    </table>`}
                 </div>
             </div>
 
@@ -333,9 +363,24 @@ const NetSwitchPage = {
     },
 
     _renderPortGrid(sw, ports) {
-        // Generate mock ports if none available
         const portCount = this._getPortCount(sw.model);
-        if (ports.length === 0) {
+
+        // If connected but no port data from API, show a helpful message instead of dead mock ports
+        if (ports.length === 0 && sw.connected && !sw.virtual) {
+            return `
+                <div style="text-align:center;padding:24px 16px;color:var(--text-muted)">
+                    <i class="fas fa-ethernet" style="font-size:32px;opacity:0.3;margin-bottom:12px;display:block"></i>
+                    <p style="font-size:13px;margin-bottom:8px;color:var(--text-secondary)">Switch is connected but port data is not available via API.</p>
+                    <p style="font-size:11px;margin-bottom:12px">The device may use a different management protocol or require authentication.</p>
+                    <a href="http://${UI.esc(sw.ip)}" target="_blank" class="btn btn-sm btn-primary" style="display:inline-flex;align-items:center;gap:6px">
+                        <i class="fas fa-external-link-alt"></i> Open Web Interface (${UI.esc(sw.ip)})
+                    </a>
+                    <p style="font-size:10px;margin-top:12px;color:var(--text-muted)">Port count for ${UI.esc(sw.model)}: ${portCount} ports expected</p>
+                </div>`;
+        }
+
+        // Generate mock ports only for virtual/demo devices
+        if (ports.length === 0 && (sw.virtual || !sw.connected)) {
             ports = Array.from({length: portCount}, (_, i) => ({
                 id: i + 1,
                 name: `Port ${i + 1}`,
@@ -352,6 +397,7 @@ const NetSwitchPage = {
                 type: i >= portCount - 2 ? 'sfp' : 'rj45',
             }));
         }
+
         return `
             <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:6px">
                 ${ports.map(p => {
@@ -460,7 +506,7 @@ const NetSwitchPage = {
         if (dmxPorts.length === 0) {
             // Generate mock for LumiNode
             const sw = this._getSelected();
-            const count = sw?.model?.includes('12') ? 12 : sw?.model?.includes('4') ? 4 : sw?.model?.includes('2') ? 2 : 1;
+            const count = sw?.model?.includes('MX40') ? 4 : sw?.model?.includes('12') ? 12 : sw?.model?.includes('4') ? 4 : sw?.model?.includes('2') ? 2 : 1;
             dmxPorts = Array.from({length: count}, (_, i) => ({
                 id: i + 1,
                 protocol: 'Art-Net',
@@ -642,6 +688,8 @@ const NetSwitchPage = {
         const sw = this._getSelected();
         if (sw && !sw.virtual) {
             await this._checkConnection(sw);
+            // Always try a full refresh after connection check — even if partially connected,
+            // refreshSwitch will gather whatever data it can
             if (sw.connected) await this.refreshSwitch(sw.id);
         }
     },
@@ -671,53 +719,130 @@ const NetSwitchPage = {
     // ============================================================
     // API COMMUNICATION
     // ============================================================
+    // Alternative API path mappings for different Luminex firmware versions
+    _altPaths: {
+        '/api/system/info':     ['/api/v1/system', '/api/v1/system/info', '/api/system'],
+        '/api/system/status':   ['/api/v1/system/status'],
+        '/api/system/hostname': ['/api/v1/system/hostname'],
+        '/api/system/reboot':   ['/api/v1/system/reboot'],
+        '/api/ports':           ['/api/v1/ports', '/api/network/ports', '/api/v1/network/ports'],
+        '/api/poe':             ['/api/v1/poe', '/api/poe/status'],
+        '/api/vlans':           ['/api/v1/vlans', '/api/network/vlans'],
+        '/api/network/igmp':    ['/api/v1/network/igmp'],
+        '/api/network/stp':     ['/api/v1/network/stp'],
+        '/api/network/lldp':    ['/api/v1/network/lldp', '/api/lldp'],
+        '/api/dmx/ports':       ['/api/v1/dmx/ports', '/api/v1/dmx', '/api/dmx'],
+        '/api/dmx/{id}/config': ['/api/v1/dmx/{id}/config', '/api/v1/dmx/ports/{id}', '/api/dmx/ports/{id}'],
+        '/api/system/logs':     ['/api/v1/system/logs', '/api/v1/logs'],
+    },
+
     async _apiCall(sw, section, endpoint, body) {
         const ep = this._api[section]?.[endpoint];
         if (!ep) return null;
         let path = ep.path;
-        if (body?.id) { path = path.replace('{id}', body.id); delete body.id; }
-        const url = `${this._api.baseUrl(sw.ip)}${path}`;
-        try {
-            const opts = { method: ep.method, signal: AbortSignal.timeout(5000) };
-            if (body && (ep.method === 'POST' || ep.method === 'PUT')) {
-                opts.headers = { 'Content-Type': 'application/json' };
-                opts.body = JSON.stringify(body);
+        const paramId = body?.id;
+        if (paramId !== undefined) { path = path.replace('{id}', paramId); delete body.id; }
+
+        // Build list of paths to try: primary first, then alternatives
+        const pathsToTry = [path];
+        const basePath = ep.path; // un-substituted path for alt lookup
+        if (this._altPaths[basePath]) {
+            for (const alt of this._altPaths[basePath]) {
+                let altPath = alt;
+                if (paramId !== undefined) altPath = altPath.replace('{id}', paramId);
+                pathsToTry.push(altPath);
             }
-            const resp = await fetch(url, opts);
-            const text = await resp.text();
-            sw.connected = true;
-            sw.lastSeen = Date.now();
-            try { return JSON.parse(text); } catch { return text; }
-        } catch (e) {
-            // Fallback: try root URL to check if device is reachable at all
-            if (section === 'system' && endpoint === 'info') {
-                try {
-                    const fallback = await fetch(`http://${sw.ip}/`, { signal: AbortSignal.timeout(5000) });
-                    if (fallback.ok || fallback.status < 500) {
-                        sw.connected = true;
-                        sw.lastSeen = Date.now();
-                        return { model: sw.model, firmware: 'N/A (web only)' };
-                    }
-                } catch {}
-            }
-            sw.connected = false;
-            return null;
         }
+
+        for (const tryPath of pathsToTry) {
+            const url = `${this._api.baseUrl(sw.ip)}${tryPath}`;
+            try {
+                const opts = { method: ep.method, signal: AbortSignal.timeout(5000) };
+                if (body && (ep.method === 'POST' || ep.method === 'PUT')) {
+                    opts.headers = { 'Content-Type': 'application/json' };
+                    opts.body = JSON.stringify(body);
+                }
+                const resp = await fetch(url, opts);
+                if (!resp.ok && resp.status >= 400) continue; // try next path
+                const text = await resp.text();
+                sw.connected = true;
+                sw.lastSeen = Date.now();
+                try { return JSON.parse(text); } catch { return text; }
+            } catch (e) {
+                continue; // try next path
+            }
+        }
+
+        // All API paths failed — try root URL to check basic reachability
+        if (section === 'system' && endpoint === 'info') {
+            try {
+                const fallback = await fetch(`http://${sw.ip}/`, { signal: AbortSignal.timeout(5000) });
+                if (fallback.ok || fallback.status < 500) {
+                    sw.connected = true;
+                    sw.lastSeen = Date.now();
+                    sw._webOnlyMode = true;
+                    return { model: sw.model, firmware: 'N/A (web interface only)', _webOnly: true };
+                }
+            } catch {}
+        }
+        // Do NOT set sw.connected = false here — let _checkConnection handle that
+        return null;
     },
 
     async _checkConnection(sw) {
+        if (sw.virtual) { sw.connected = true; this._updateList(); return; }
+
+        // Try system info first (covers most Luminex devices)
         const info = await this._apiCall(sw, 'system', 'info');
-        sw.connected = info !== null;
         if (info) {
+            sw.connected = true;
+            sw.lastSeen = Date.now();
             sw.status.info = info;
+            sw._webOnlyMode = !!info._webOnly;
+            this._updateList();
+            return;
         }
+
+        // For LumiNode devices, also try DMX endpoint as a connection check
+        if (sw.type === 'luminode') {
+            const dmx = await this._apiCall(sw, 'dmx', 'ports');
+            if (dmx) {
+                sw.connected = true;
+                sw.lastSeen = Date.now();
+                sw.status.dmx = Array.isArray(dmx) ? dmx : [];
+                sw._webOnlyMode = false;
+                this._updateList();
+                return;
+            }
+        }
+
+        // Last resort: try pinging the root URL directly
+        try {
+            const resp = await fetch(`http://${sw.ip}/`, { signal: AbortSignal.timeout(5000) });
+            if (resp.ok || resp.status < 500) {
+                sw.connected = true;
+                sw.lastSeen = Date.now();
+                sw._webOnlyMode = true;
+                if (!sw.status.info) sw.status.info = { model: sw.model, firmware: 'N/A (web interface only)', _webOnly: true };
+                this._updateList();
+                return;
+            }
+        } catch {}
+
+        sw.connected = false;
+        sw._webOnlyMode = false;
         this._updateList();
     },
 
     async refreshSwitch(id) {
         const sw = this._switches.find(s => s.id === id);
         if (!sw) return;
-        const [info, status, ports, poe, vlans, igmp, stp, lldp, logs] = await Promise.allSettled([
+
+        // Track which data categories we successfully loaded
+        sw._dataAvailable = {};
+
+        const isLumiNode = sw.type === 'luminode';
+        const fetchList = [
             this._apiCall(sw, 'system', 'info'),
             this._apiCall(sw, 'system', 'status'),
             this._apiCall(sw, 'ports', 'list'),
@@ -727,21 +852,95 @@ const NetSwitchPage = {
             this._apiCall(sw, 'network', 'stp'),
             this._apiCall(sw, 'network', 'lldp'),
             this._apiCall(sw, 'system', 'logs'),
-        ]);
-        sw.status = {
-            info: info.value || sw.status.info || {},
-            system: status.value || {},
-            ports: ports.value || [],
-            poe: poe.value || {},
-            vlans: vlans.value || [],
-            igmp: igmp.value || {},
-            stp: stp.value || {},
-            lldp: lldp.value || [],
-            logs: logs.value || [],
+            isLumiNode ? this._apiCall(sw, 'dmx', 'ports') : Promise.resolve(null),
+        ];
+        const [info, status, ports, poe, vlans, igmp, stp, lldp, logs, dmxResult] = await Promise.allSettled(fetchList);
+
+        // Parse port data — handle different API response formats
+        let parsedPorts = [];
+        const portsRaw = ports.value;
+        if (portsRaw) {
+            if (Array.isArray(portsRaw)) {
+                parsedPorts = portsRaw;
+            } else if (portsRaw.ports && Array.isArray(portsRaw.ports)) {
+                parsedPorts = portsRaw.ports;
+            } else if (typeof portsRaw === 'object' && !Array.isArray(portsRaw)) {
+                // Some firmware returns { "1": {...}, "2": {...} } keyed by port ID
+                parsedPorts = Object.entries(portsRaw)
+                    .filter(([k]) => !isNaN(k) || k.startsWith('port'))
+                    .map(([k, v]) => ({ id: parseInt(k) || v.id || k, ...v }));
+            }
+            // Normalize port fields — handle different API naming conventions
+            parsedPorts = parsedPorts.map(p => {
+                const linkVal = p.link ?? p.linkUp ?? (p.link_status === 'up') ?? (p.status === 'up') ?? false;
+                const enabledVal = p.enabled ?? (p.admin_state !== undefined ? p.admin_state !== 'disabled' : true);
+                return {
+                    id: p.id || p.port || p.port_id || p.number || p.index || 0,
+                    name: p.name || p.label || p.description || `Port ${p.id || p.port || p.port_id || p.number || '?'}`,
+                    link: typeof linkVal === 'boolean' ? linkVal : !!linkVal,
+                    speed: p.speed || p.linkSpeed || p.link_speed || p.negotiated_speed || '--',
+                    duplex: p.duplex || p.link_duplex || p.negotiated_duplex || '--',
+                    txBytes: p.txBytes || p.tx_bytes || p.statistics?.tx_bytes || p.counters?.tx_bytes || 0,
+                    rxBytes: p.rxBytes || p.rx_bytes || p.statistics?.rx_bytes || p.counters?.rx_bytes || 0,
+                    txPackets: p.txPackets || p.tx_packets || p.statistics?.tx_packets || p.counters?.tx_packets || 0,
+                    rxPackets: p.rxPackets || p.rx_packets || p.statistics?.rx_packets || p.counters?.rx_packets || 0,
+                    errors: p.errors || p.error_count || p.statistics?.errors || p.counters?.errors || 0,
+                    vlan: p.vlan || p.pvid || p.default_vlan || 1,
+                    enabled: typeof enabledVal === 'boolean' ? enabledVal : !!enabledVal,
+                    type: p.type || p.media || (p.connector === 'sfp' || p.port_type === 'sfp' ? 'sfp' : 'rj45'),
+                };
+            });
+        }
+
+        sw._dataAvailable = {
+            info: !!info.value,
+            system: !!status.value,
+            ports: parsedPorts.length > 0,
+            poe: !!poe.value,
+            vlans: !!vlans.value,
         };
-        if (sw.type === 'luminode') {
-            const dmx = await this._apiCall(sw, 'dmx', 'ports');
-            sw.status.dmx = dmx || [];
+
+        // Preserve existing data if new fetch failed (don't wipe good data with empty)
+        const prev = sw.status || {};
+        sw.status = {
+            info: info.value || prev.info || {},
+            system: status.value || prev.system || {},
+            ports: parsedPorts.length > 0 ? parsedPorts : prev.ports || [],
+            poe: poe.value || prev.poe || {},
+            vlans: (Array.isArray(vlans.value) ? vlans.value : vlans.value?.vlans) || prev.vlans || [],
+            igmp: igmp.value || prev.igmp || {},
+            stp: stp.value || prev.stp || {},
+            lldp: (Array.isArray(lldp.value) ? lldp.value : lldp.value?.neighbors) || prev.lldp || [],
+            logs: (Array.isArray(logs.value) ? logs.value : logs.value?.logs) || prev.logs || [],
+        };
+
+        // Process DMX data from parallel fetch (LumiNode devices)
+        if (isLumiNode) {
+            const dmxRaw = dmxResult.value;
+            let parsedDmx = [];
+            if (dmxRaw) {
+                if (Array.isArray(dmxRaw)) parsedDmx = dmxRaw;
+                else if (dmxRaw.ports && Array.isArray(dmxRaw.ports)) parsedDmx = dmxRaw.ports;
+                else if (typeof dmxRaw === 'object' && !Array.isArray(dmxRaw)) {
+                    // Handle keyed object format: { "1": {...}, "2": {...} }
+                    parsedDmx = Object.entries(dmxRaw)
+                        .filter(([k]) => !isNaN(k) || k.startsWith('port') || k.startsWith('dmx'))
+                        .map(([k, v]) => ({ id: parseInt(k) || v.id || v.port || k, ...v }));
+                }
+                // Normalize DMX port fields for different firmware naming
+                parsedDmx = parsedDmx.map(d => ({
+                    id: d.id || d.port || d.port_id || d.index || 0,
+                    protocol: d.protocol || d.proto || d.type || 'Art-Net',
+                    direction: d.direction || d.dir || d.mode || 'Output',
+                    universe: d.universe ?? d.uni ?? 0,
+                    subnet: d.subnet ?? d.sub ?? 0,
+                    net: d.net ?? 0,
+                    mergeMode: d.mergeMode || d.merge_mode || d.merge || 'HTP',
+                    active: d.active ?? d.is_active ?? d.status === 'active' ?? false,
+                }));
+                sw._dataAvailable.dmx = parsedDmx.length > 0;
+            }
+            sw.status.dmx = parsedDmx.length > 0 ? parsedDmx : prev.dmx || [];
         }
         this._refreshAll();
     },
@@ -870,37 +1069,49 @@ const NetSwitchPage = {
     async setDmxProtocol(portId, protocol) {
         const sw = this._getSelected();
         if (!sw) return;
-        await this._apiCall(sw, 'dmx', 'setPortConfig', { id: portId, protocol });
+        const result = await this._apiCall(sw, 'dmx', 'setPortConfig', { id: portId, protocol });
+        UI.toast(result !== null ? `DMX Port ${portId} protocol set to ${protocol}` : `Failed to set protocol on DMX Port ${portId}`, result !== null ? 'info' : 'error');
+        if (result !== null) this.refreshSwitch(sw.id);
     },
 
     async setDmxDirection(portId, direction) {
         const sw = this._getSelected();
         if (!sw) return;
-        await this._apiCall(sw, 'dmx', 'setPortConfig', { id: portId, direction });
+        const result = await this._apiCall(sw, 'dmx', 'setPortConfig', { id: portId, direction });
+        UI.toast(result !== null ? `DMX Port ${portId} direction set to ${direction}` : `Failed to set direction on DMX Port ${portId}`, result !== null ? 'info' : 'error');
+        if (result !== null) this.refreshSwitch(sw.id);
     },
 
     async setDmxUniverse(portId, universe) {
         const sw = this._getSelected();
         if (!sw) return;
-        await this._apiCall(sw, 'dmx', 'setPortConfig', { id: portId, universe: parseInt(universe) });
+        const result = await this._apiCall(sw, 'dmx', 'setPortConfig', { id: portId, universe: parseInt(universe) });
+        UI.toast(result !== null ? `DMX Port ${portId} universe set to ${universe}` : `Failed to set universe on DMX Port ${portId}`, result !== null ? 'info' : 'error');
+        if (result !== null) this.refreshSwitch(sw.id);
     },
 
     async setDmxSubnet(portId, subnet) {
         const sw = this._getSelected();
         if (!sw) return;
-        await this._apiCall(sw, 'dmx', 'setPortConfig', { id: portId, subnet: parseInt(subnet) });
+        const result = await this._apiCall(sw, 'dmx', 'setPortConfig', { id: portId, subnet: parseInt(subnet) });
+        UI.toast(result !== null ? `DMX Port ${portId} subnet set to ${subnet}` : `Failed to set subnet on DMX Port ${portId}`, result !== null ? 'info' : 'error');
+        if (result !== null) this.refreshSwitch(sw.id);
     },
 
     async setDmxNet(portId, net) {
         const sw = this._getSelected();
         if (!sw) return;
-        await this._apiCall(sw, 'dmx', 'setPortConfig', { id: portId, net: parseInt(net) });
+        const result = await this._apiCall(sw, 'dmx', 'setPortConfig', { id: portId, net: parseInt(net) });
+        UI.toast(result !== null ? `DMX Port ${portId} net set to ${net}` : `Failed to set net on DMX Port ${portId}`, result !== null ? 'info' : 'error');
+        if (result !== null) this.refreshSwitch(sw.id);
     },
 
     async setDmxMerge(portId, mergeMode) {
         const sw = this._getSelected();
         if (!sw) return;
-        await this._apiCall(sw, 'dmx', 'setPortConfig', { id: portId, mergeMode });
+        const result = await this._apiCall(sw, 'dmx', 'setPortConfig', { id: portId, mergeMode });
+        UI.toast(result !== null ? `DMX Port ${portId} merge mode set to ${mergeMode}` : `Failed to set merge mode on DMX Port ${portId}`, result !== null ? 'info' : 'error');
+        if (result !== null) this.refreshSwitch(sw.id);
     },
 
     // ============================================================
@@ -913,11 +1124,13 @@ const NetSwitchPage = {
             container.innerHTML = '';
             return;
         }
+        const onPage = (typeof appState !== 'undefined') && appState.get('currentPage') === 'netswitch';
         container.innerHTML = this._switches.map(s => {
             const dot = s.connected ? '#4ade80' : '#ef4444';
             const typeLabel = s.type === 'luminode' ? 'LumiNode' : s.type === 'cameo' ? 'Cameo' : 'GigaCore';
+            const sel = onPage && s.id === this._selectedId ? 'selected' : '';
             return `
-                <div class="sidebar-device-card" onclick="NetSwitchPage.selectSwitch('${s.id}');HippoApp.navigate('netswitch')">
+                <div class="sidebar-device-card ${sel}" onclick="NetSwitchPage.selectSwitch('${s.id}');HippoApp.navigate('netswitch')">
                     <span class="device-dot" style="background:${dot}"></span>
                     <div class="device-info">
                         <div class="device-name">${UI.esc(s.name)}</div>

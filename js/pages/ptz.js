@@ -464,10 +464,10 @@ const PtzPage = {
                 <div class="card-header"><h3><i class="fas fa-sliders-h"></i> Image Adjustments</h3></div>
                 <div class="card-body">
                     <table class="ledcalc-input-table">
-                        ${this._renderSlider('Detail / Sharpness', 'ptz-detail', 0, 255, 128, 'PtzPage._sendImageAdj("detail")')}
-                        ${this._renderSlider('Contrast', 'ptz-contrast', 0, 255, 128, 'PtzPage._sendImageAdj("contrast")')}
-                        ${this._renderSlider('Brightness', 'ptz-brightness', 0, 255, 128, 'PtzPage._sendImageAdj("brightness")')}
-                        ${this._renderSlider('Saturation', 'ptz-saturation', 0, 255, 128, 'PtzPage._sendImageAdj("saturation")')}
+                        ${this._renderSlider('Detail / Sharpness', 'ptz-detail', 0, 255, cam._imgDetail ?? 128, 'PtzPage._sendImageAdj("detail")')}
+                        ${this._renderSlider('Contrast', 'ptz-contrast', 0, 255, cam._imgContrast ?? 128, 'PtzPage._sendImageAdj("contrast")')}
+                        ${this._renderSlider('Brightness', 'ptz-brightness', 0, 255, cam._imgBrightness ?? 128, 'PtzPage._sendImageAdj("brightness")')}
+                        ${this._renderSlider('Saturation', 'ptz-saturation', 0, 255, cam._imgSaturation ?? 128, 'PtzPage._sendImageAdj("saturation")')}
                     </table>
                 </div>
             </div>
@@ -1022,6 +1022,9 @@ const PtzPage = {
         const cam = this._getSelected();
         if (!cam) return;
         const val = parseInt(document.getElementById(`ptz-${type}`)?.value) || 128;
+        // Store on camera so value persists across re-renders
+        const storeKeys = { detail: '_imgDetail', contrast: '_imgContrast', brightness: '_imgBrightness', saturation: '_imgSaturation' };
+        if (storeKeys[type]) cam[storeKeys[type]] = val;
         if (cam.type === 'panasonic') {
             const cmds = { detail: 'detail', contrast: 'pedestal', brightness: 'masterPed', saturation: 'chroma' };
             this._sendPanasonic(cam, 'cam', this._panasonic.camCommands[cmds[type]](val));
@@ -1200,11 +1203,13 @@ const PtzPage = {
             container.innerHTML = '';
             return;
         }
+        const onPage = (typeof appState !== 'undefined') && appState.get('currentPage') === 'ptz';
         container.innerHTML = this._cameras.map(c => {
             const dot = c.connected ? '#4ade80' : '#ef4444';
             const brand = c.type === 'panasonic' ? 'Panasonic' : 'BirdDog';
+            const sel = onPage && c.id === this._selectedId ? 'selected' : '';
             return `
-                <div class="sidebar-device-card" onclick="PtzPage.selectCamera('${c.id}');HippoApp.navigate('ptz')">
+                <div class="sidebar-device-card ${sel}" onclick="PtzPage.selectCamera('${c.id}');HippoApp.navigate('ptz')">
                     <span class="device-dot" style="background:${dot}"></span>
                     <div class="device-info">
                         <div class="device-name">${UI.esc(c.name)}</div>

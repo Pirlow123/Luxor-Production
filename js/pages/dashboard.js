@@ -1,5 +1,5 @@
 /**
- * Dashboard Page — Overview of connected server
+ * Dashboard Page — UniFi-style overview homepage + server-specific dashboards
  */
 const DashboardPage = {
     render() {
@@ -7,15 +7,7 @@ const DashboardPage = {
         const connected = appState.get('connected');
 
         if (!connected) {
-            return `
-                <div class="empty-state" style="padding:80px 20px">
-                    <i class="fas fa-plug" style="font-size:48px;opacity:0.15;margin-bottom:16px"></i>
-                    <h3>No Server Connected</h3>
-                    <p>Add a server (Hippotizer, Resolume, vMix, CasparCG, OBS, Barco E2, QLab, Disguise, Pixera, Blackmagic ATEM) to begin.</p>
-                    <button class="btn btn-primary mt-md" onclick="HippoApp.showAddServer()">
-                        <i class="fas fa-plus"></i> Add Server
-                    </button>
-                </div>`;
+            return this._renderHomeDashboard();
         }
 
         const serverType = appState.get('serverType');
@@ -434,12 +426,158 @@ const DashboardPage = {
         `).join('');
     },
 
+    /* ── Home Dashboard — category card grid with device info ── */
+    _renderHomeDashboard() {
+        const servers = appState.get('servers') || [];
+        const statuses = appState.get('serverStatuses') || {};
+
+        // Load all device lists from localStorage (merge real + virtual)
+        const _load = (key) => { try { return JSON.parse(localStorage.getItem(key) || '[]'); } catch { return []; } };
+        const ledProcs = _load('luxor_led_processors');
+        const ptzCams = [..._load('luxor_ptz_cameras'), ..._load('luxor_ptz_cameras_virtual')];
+        const netSwitches = [..._load('luxor_net_switches'), ..._load('luxor_net_switches_virtual')];
+        const lightConsoles = [..._load('luxor_lighting_consoles'), ..._load('luxor_lighting_consoles_virtual')];
+        const intercoms = [..._load('luxor_intercom_systems'), ..._load('luxor_intercom_systems_virtual')];
+
+        const typeLabel = (t) => ({ hippo: 'Hippotizer', resolume: 'Resolume', vmix: 'vMix', casparcg: 'CasparCG', obs: 'OBS', barco: 'Barco E2', qlab: 'QLab', disguise: 'Disguise', pixera: 'Pixera', atem: 'ATEM' }[t] || t);
+
+        // Color-coding helpers: green=good, yellow=warn, orange=high, red=critical
+        const _tempColor = (v) => { if (v == null) return ''; if (v < 45) return 'text-green'; if (v < 60) return 'text-yellow'; if (v < 75) return 'text-orange'; return 'text-red'; };
+        const _cpuColor = (v) => { if (v == null) return ''; if (v < 50) return 'text-green'; if (v < 75) return 'text-yellow'; if (v < 90) return 'text-orange'; return 'text-red'; };
+        const _memColor = (v) => { if (v == null) return ''; if (v < 60) return 'text-green'; if (v < 80) return 'text-yellow'; if (v < 90) return 'text-orange'; return 'text-red'; };
+        const _powerColor = (v) => { if (v == null) return ''; if (v < 100) return 'text-green'; if (v < 200) return 'text-yellow'; if (v < 300) return 'text-orange'; return 'text-red'; };
+        const _fanColor = (v) => { if (v == null) return ''; if (v < 3000) return 'text-green'; if (v < 5000) return 'text-yellow'; if (v < 7000) return 'text-orange'; return 'text-red'; };
+        const _dectColor = (v) => { if (!v) return ''; if (v === 'OK') return 'text-green'; if (v === 'Warning') return 'text-yellow'; return 'text-red'; };
+        const _gmColor = (v) => { if (v == null) return ''; if (v >= 90) return 'text-green'; if (v >= 50) return 'text-yellow'; if (v >= 20) return 'text-orange'; return 'text-red'; };
+
+        // Helper: build a stat cell
+        const _stat = (label, value, colorClass) => `<div class="dash-stat"><span class="dash-stat-label">${label}</span><span class="dash-stat-value ${colorClass || ''}">${value}</span></div>`;
+
+        // Helper: build a device card
+        const _devCard = (name, ip, online, onclick, statsHtml) => `
+            <div class="dash-device-card" onclick="${onclick}">
+                <div class="dash-device-top">
+                    <span class="dash-status-dot ${online ? 'online' : 'offline'}"></span>
+                    <span class="dash-device-name">${UI.esc(name)}</span>
+                    <span class="dash-device-ip">${UI.esc(ip)}</span>
+                </div>
+                <div class="dash-stats-grid">${statsHtml}</div>
+            </div>`;
+
+        // Build server items
+        const serverItems = servers.map(s => {
+            const info = statuses[s.id]?.info || {};
+            const online = statuses[s.id]?.online;
+            const ip = s.virtual ? 'Virtual' : `${s.host}:${s.port}`;
+            const engine = info.engineStatus || (online ? 'Running' : '--');
+            const system = info.mediaManagerStatus || '--';
+            const firmware = info.softwareVersion || info.version || info.firmware || '--';
+            const stats = _stat('Engine', engine, engine === 'Running' ? 'text-green' : engine === '--' ? '' : 'text-red')
+                + _stat('System', system, system === 'Running' ? 'text-green' : system === '--' ? '' : 'text-red')
+                + _stat('Type', typeLabel(s.type))
+                + _stat('Firmware', firmware);
+            return _devCard(s.name, ip, online, `HippoApp.connectToServer('${s.id}')`, stats);
+        }).join('');
+
+        // Build LED processor items
+        const procItems = ledProcs.map(p => {
+            const online = p.online || p.virtual;
+            const ip = p.virtual ? 'Virtual' : (p.host + ':' + p.port);
+            const stats = _stat('Resolution', p._resolution || '--')
+                + _stat('Input', p._activeInput || '--')
+                + _stat('Status', online ? 'Online' : 'Offline', online ? 'text-green' : 'text-red')
+                + (p._firmware ? _stat('Firmware', p._firmware) : '');
+            return _devCard(p.name, ip, online, `HippoApp.navigate('ledprocessor')`, stats);
+        }).join('');
+
+        // Build PTZ items
+        const ptzItems = ptzCams.map(c => {
+            const online = c.connected || c.virtual;
+            const ip = c.virtual ? 'Virtual' : (c.host || '--');
+            const stats = _stat('Model', c.model || c.type || '--')
+                + _stat('Status', online ? 'Online' : 'Offline', online ? 'text-green' : 'text-red');
+            return _devCard(c.name, ip, online, `HippoApp.navigate('ptz')`, stats);
+        }).join('');
+
+        // Build net switch items
+        const _fmtUptime = (sec) => { if (!sec) return '--'; const d = Math.floor(sec/86400); const h = Math.floor((sec%86400)/3600); return `${d}d ${h}h`; };
+        const switchItems = netSwitches.map(s => {
+            const online = s.connected || s.virtual;
+            const st = s.status || {}; const sys = st.system || {}; const info = st.info || {};
+            const ip = s.virtual ? 'Virtual' : (s.ip || s.host || '--');
+            const stats = _stat('Temp', sys.temperature ? sys.temperature + '°C' : '--', _tempColor(sys.temperature))
+                + _stat('Fan', sys.fanSpeed ? sys.fanSpeed + ' RPM' : '--', _fanColor(sys.fanSpeed))
+                + _stat('CPU', sys.cpu !== undefined ? sys.cpu + '%' : '--', _cpuColor(sys.cpu))
+                + _stat('Memory', sys.memory !== undefined ? sys.memory + '%' : '--', _memColor(sys.memory))
+                + _stat('Power', sys.powerDraw ? sys.powerDraw + 'W' : '--', _powerColor(sys.powerDraw))
+                + _stat('Uptime', info.uptime ? _fmtUptime(info.uptime) : '--', 'text-green');
+            return _devCard(s.name, ip, online, `HippoApp.navigate('netswitch')`, stats);
+        }).join('');
+
+        // Build lighting items
+        const lightItems = lightConsoles.map(c => {
+            const online = c.connected || c.virtual;
+            const st = c.status || {};
+            const session = st.session; const gm = st.grandmaster;
+            const activeExecs = (st.executors || []).filter(e => e.active).length;
+            const totalExecs = (st.executors || []).length;
+            const ip = c.virtual ? 'Virtual' : (c.ip || c.host || '--');
+            let stats = _stat('Model', c.model || c.type || '--');
+            if (session) stats += _stat('Showfile', session.showFile || '--', 'text-green');
+            if (gm !== undefined) stats += _stat('Grand Master', gm + '%', _gmColor(gm));
+            if (totalExecs) stats += _stat('Executors', activeExecs + '/' + totalExecs, 'text-green');
+            return _devCard(c.name, ip, online, `HippoApp.navigate('lighting')`, stats);
+        }).join('');
+
+        // Build intercom items
+        const intercomItems = intercoms.map(i => {
+            const online = i.connected || i.virtual;
+            const st = i.status || {}; const sys = st.system || {};
+            const beltpacks = st.beltpacks || []; const antennas = st.antennas || []; const channels = st.channels || [];
+            const ip = i.virtual ? 'Virtual' : (i.ip || i.host || '--');
+            const stats = _stat('Temp', sys.temperature ? sys.temperature + '°C' : '--', _tempColor(sys.temperature))
+                + _stat('Beltpacks', beltpacks.length, 'text-green')
+                + _stat('Antennas', antennas.length, 'text-green')
+                + _stat('Channels', channels.length, 'text-green')
+                + _stat('DECT', sys.dectStatus || '--', _dectColor(sys.dectStatus))
+                + _stat('Power', sys.powerDraw ? sys.powerDraw + 'W' : '--', _powerColor(sys.powerDraw));
+            return _devCard(i.name, ip, online, `HippoApp.navigate('intercom')`, stats);
+        }).join('');
+
+        // Category card builder with icon
+        const catCard = (icon, title, page, items, count, addAction) => `
+            <div class="dash-category-card">
+                <div class="dash-cat-header">
+                    <div class="dash-cat-header-left">
+                        <div class="dash-cat-icon"><i class="fas ${icon}"></i></div>
+                        <span class="dash-cat-title">${title}<span class="dash-cat-count"> (${count})</span></span>
+                    </div>
+                    <button class="btn-inline-add" onclick="event.stopPropagation();${addAction}" title="Add"><i class="fas fa-plus"></i></button>
+                </div>
+                <div class="dash-cat-body">
+                    ${items || '<div class="dash-cat-empty">No devices</div>'}
+                </div>
+            </div>`;
+
+        return `
+            <div class="dash-grid">
+                ${catCard('fa-server', 'Media Servers', 'dashboard', serverItems, servers.length, 'HippoApp.showAddServer()')}
+                ${catCard('fa-microchip', 'Processors', 'ledprocessor', procItems, ledProcs.length, 'HippoApp.showAddLedProcessor()')}
+                ${catCard('fa-network-wired', 'Network', 'netswitch', switchItems, netSwitches.length, 'NetSwitchPage.showAddSwitch()')}
+                ${catCard('fa-lightbulb', 'Lighting', 'lighting', lightItems, lightConsoles.length, 'LightingPage.showAddConsole()')}
+                ${catCard('fa-headset', 'Intercom', 'intercom', intercomItems, intercoms.length, 'IntercomPage.showAddSystem()')}
+                ${catCard('fa-video', 'PTZ Cameras', 'ptz', ptzItems, ptzCams.length, 'PtzPage.showAddCamera()')}
+            </div>
+        `;
+    },
+
     _renderBarcoDash() {
-        const presets = appState.get('barcoPresets') || {};
-        const destinations = appState.get('barcoDestinations') || [];
-        const sources = appState.get('barcoSources') || [];
-        const activePreset = presets.active || '--';
-        const previewPreset = presets.preview || '--';
+        const barcoState = appState.get('barcoState') || {};
+        const presets = barcoState.presets || [];
+        const destinations = barcoState.destinations || [];
+        const sources = barcoState.sources || [];
+        const activePreset = barcoState.activePreset || '--';
+        const previewPreset = barcoState.previewPreset || '--';
 
         return `
             <div class="dashboard-stats">
@@ -492,18 +630,17 @@ const DashboardPage = {
     },
 
     _renderQlabDash() {
-        const workspaces = appState.get('qlabWorkspaces') || [];
-        const cueLists = appState.get('qlabCueLists') || [];
-        const activeWs = appState.get('qlabActiveWorkspace') || {};
-        const wsName = activeWs.name || workspaces[0]?.name || '--';
-        const playbackStatus = activeWs.playbackStatus || 'stopped';
-        const currentCue = activeWs.currentCue || '--';
-        const masterVolume = activeWs.masterVolume ?? 100;
+        const qlabState = appState.get('qlabState') || {};
+        const cues = qlabState.cues || [];
+        const wsId = qlabState.workspaceId || '';
+        const wsName = wsId || '--';
+        const playbackStatus = qlabState.runningCues?.length ? 'playing' : 'stopped';
+        const currentCue = qlabState.currentCueId || '--';
+        const masterVolume = qlabState.masterVolume ?? 100;
 
         const statusColor = playbackStatus === 'playing' ? 'green' : playbackStatus === 'paused' ? 'orange' : 'red';
 
-        // Flatten cue lists into cues for table
-        const cues = cueLists.flatMap(cl => cl.cues || []);
+        // cues already loaded from qlabState.cues above
 
         const cueTypeBadge = (type) => {
             const t = (type || '').toLowerCase();
@@ -519,7 +656,7 @@ const DashboardPage = {
 
         return `
             <div class="dashboard-stats">
-                ${UI.statCard('fa-theater-masks', 'purple', 'Workspace', UI.esc(wsName), `${workspaces.length} workspace(s)`)}
+                ${UI.statCard('fa-theater-masks', 'purple', 'Workspace', UI.esc(wsName), wsId ? '1 workspace' : 'No workspace')}
                 ${UI.statCard('fa-play-circle', statusColor, 'Playback', UI.badge(playbackStatus.charAt(0).toUpperCase() + playbackStatus.slice(1), statusColor), 'Transport state')}
                 ${UI.statCard('fa-list-ol', 'accent', 'Current Cue', UI.esc(currentCue), 'Active cue position')}
                 ${UI.statCard('fa-volume-up', 'blue', 'Master Volume', `${masterVolume}%`, 'Output level')}
@@ -556,14 +693,15 @@ const DashboardPage = {
     },
 
     _renderDisguiseDash() {
-        const tracks = appState.get('disguiseTracks') || [];
-        const transport = appState.get('disguiseTransport') || {};
-        const sections = appState.get('disguiseSections') || [];
-        const machines = appState.get('disguiseMachines') || [];
+        const dState = appState.get('disguiseState') || {};
+        const tracks = dState.tracks || [];
+        const transport = dState.transport || {};
+        const sections = dState.annotations || [];
+        const machines = dState.health || [];
         const outputs = transport.outputs || [];
 
-        const timecode = transport.timecode || '--:--:--:--';
-        const playing = transport.playing;
+        const timecode = dState.timecode || '--:--:--:--';
+        const playing = dState.isPlaying;
         const speed = transport.speed ?? 1;
         const currentSection = transport.currentSection || '--';
 
@@ -665,8 +803,9 @@ const DashboardPage = {
     },
 
     _renderPixeraDash() {
-        const timelines = appState.get('pixeraTimelines') || [];
-        const screens = appState.get('pixeraScreens') || [];
+        const pState = appState.get('pixeraState') || {};
+        const timelines = pState.timelines || [];
+        const screens = pState.screens || [];
         const resourceCount = timelines.reduce((sum, tl) => sum + (tl.resources || 0), 0);
 
         const playingCount = timelines.filter(tl => tl.state === 'playing').length;
@@ -739,7 +878,7 @@ const DashboardPage = {
     _renderAtemDash() {
         const info = appState.get('serverInfo') || {};
         const atemState = appState.get('atemState') || {};
-        const inputs = appState.get('atemInputs') || [];
+        const inputs = atemState.inputs || [];
         const model = info.model || atemState.model || 'Blackmagic ATEM';
         const firmware = info.firmware || atemState.firmware || '--';
         const pgmId = atemState.program ?? info.program ?? 1;
@@ -1043,8 +1182,9 @@ const DashboardPage = {
         if (!state) return;
         const { scene } = state;
 
-        const machines = appState.get('disguiseMachines') || [];
-        const transport = appState.get('disguiseTransport') || {};
+        const dState = appState.get('disguiseState') || {};
+        const machines = dState.health || [];
+        const transport = dState.transport || {};
         const outputs = transport.outputs || [];
 
         // Try to fetch real spatial data from the deep API
@@ -1135,7 +1275,7 @@ const DashboardPage = {
         if (!state) return;
         const { scene } = state;
 
-        const screens = appState.get('pixeraScreens') || [];
+        const screens = appState.get('pixeraState')?.screens || [];
 
         // Try to fetch deep spatial data from Pixera API
         let screenDetails = null, devices = null;
@@ -1210,8 +1350,14 @@ const DashboardPage = {
         }
     },
 
+    _homeRefreshTimer: null,
+
     async onActivate() {
-        if (!appState.get('connected')) return;
+        if (!appState.get('connected')) {
+            // Home dashboard — start fast refresh to keep device info updated
+            this._startHomeRefresh();
+            return;
+        }
         // Fetch mix levels
         const info = appState.get('serverInfo');
         if (info?.mixes) {
@@ -1236,5 +1382,75 @@ const DashboardPage = {
 
     onDeactivate() {
         this._cleanup3D();
+        this._stopHomeRefresh();
+    },
+
+    _startHomeRefresh() {
+        this._stopHomeRefresh();
+        // Poll all servers for status every 3 seconds
+        this._pollAllServers();
+        this._homeRefreshTimer = setInterval(() => this._pollAllServers(), 3000);
+    },
+
+    _stopHomeRefresh() {
+        if (this._homeRefreshTimer) {
+            clearInterval(this._homeRefreshTimer);
+            this._homeRefreshTimer = null;
+        }
+    },
+
+    async _pollAllServers() {
+        const servers = appState.get('servers') || [];
+        if (servers.length === 0) return;
+
+        // Ping each server in parallel for fast updates
+        const promises = servers.map(async (s) => {
+            if (s.virtual) {
+                // Preserve existing info (version etc.), add type-specific defaults
+                const existing = (appState.get('serverStatuses') || {})[s.id]?.info || {};
+                const vInfo = { ...existing, engineStatus: 'Running', mediaManagerStatus: 'Running' };
+                // Inject version from virtual engines if not already set
+                if (!vInfo.softwareVersion && !vInfo.version && !vInfo.firmware) {
+                    const versionMap = { hippo: '4.8.1', resolume: '7.18.0', vmix: '27.0.0', casparcg: '2.3.3', obs: '30.2.0', barco: '11.3', qlab: '5.4', disguise: 'r27.1', pixera: '2.1.23', atem: '9.6.2' };
+                    vInfo.softwareVersion = (versionMap[s.type] || '1.0') + ' (Virtual)';
+                }
+                appState.updateServerStatus(s.id, { online: true, info: vInfo });
+                return;
+            }
+            try {
+                const url = `http://${s.host}:${s.port}`;
+                let info = {};
+                const serverType = s.type || 'hippo';
+                switch (serverType) {
+                    case 'hippo':
+                        const res = await fetch(`${url}/api/v4/info`, { signal: AbortSignal.timeout(2000) });
+                        if (res.ok) info = await res.json();
+                        break;
+                    case 'resolume':
+                        const rr = await fetch(`${url}/api/v1/product`, { signal: AbortSignal.timeout(2000) });
+                        if (rr.ok) info = await rr.json();
+                        break;
+                    case 'vmix':
+                        const vr = await fetch(`${url}/api`, { signal: AbortSignal.timeout(2000) });
+                        if (vr.ok) info = { engineStatus: 'Running' };
+                        break;
+                    default:
+                        const dr = await fetch(url, { signal: AbortSignal.timeout(2000) });
+                        if (dr.ok) info = { engineStatus: 'Running' };
+                        break;
+                }
+                appState.updateServerStatus(s.id, { online: true, info });
+            } catch {
+                appState.updateServerStatus(s.id, { online: false });
+            }
+        });
+
+        await Promise.allSettled(promises);
+
+        // Re-render the dashboard grid with updated info
+        const container = document.getElementById('page-content');
+        if (container && appState.get('currentPage') === 'dashboard' && !appState.get('connected')) {
+            container.innerHTML = this._renderHomeDashboard();
+        }
     }
 };

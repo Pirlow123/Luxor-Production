@@ -626,11 +626,13 @@ const LightingPage = {
             container.innerHTML = '';
             return;
         }
+        const onPage = (typeof appState !== 'undefined') && appState.get('currentPage') === 'lighting';
         container.innerHTML = this._consoles.map(c => {
             const dot = c.connected ? '#4ade80' : '#ef4444';
             const brand = c.type === 'ma' ? 'MA' : 'Avolites';
+            const sel = onPage && c.id === this._selectedId ? 'selected' : '';
             return `
-                <div class="sidebar-device-card" onclick="LightingPage.selectConsole('${c.id}');HippoApp.navigate('lighting')">
+                <div class="sidebar-device-card ${sel}" onclick="LightingPage.selectConsole('${c.id}');HippoApp.navigate('lighting')">
                     <span class="device-dot" style="background:${dot}"></span>
                     <div class="device-info">
                         <div class="device-name">${UI.esc(c.name)}</div>

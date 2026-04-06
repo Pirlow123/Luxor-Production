@@ -46,12 +46,14 @@ const HippoApp = {
         sacnmonitor:  SacnMonitorPage,
         showclock:    ShowClockPage,
         specifications: SpecificationsPage,
+        enginemedia:  EngineMediaPage,
+        enginemixing: EngineMixingPage,
         settings:     SettingsPage,
         logs:         LogsPage,
     },
 
     // Pages only visible for specific server types
-    _hippoPages: ['timelines', 'media', 'mixes', 'presets', 'pins', 'timecode', 'network', 'dmx', 'sync'],
+    _hippoPages: ['timelines', 'media', 'mixes', 'presets', 'pins', 'timecode', 'network', 'dmx'],
     _resolumePages: ['composition'],
     // Common pages shown for all: showrun, dashboard, status, settings, logs, ledprocessor
 
@@ -67,8 +69,6 @@ const HippoApp = {
         const savedTheme = localStorage.getItem('luxor_theme');
         if (savedTheme === 'light') {
             document.documentElement.dataset.theme = 'light';
-            const icon = document.querySelector('#theme-toggle i');
-            if (icon) { icon.className = 'fas fa-sun'; }
         }
 
         this.populateServerSelect();
@@ -87,38 +87,144 @@ const HippoApp = {
         // Initialize Companion Satellite connection
         if (typeof CompanionAPI !== 'undefined') CompanionAPI.init();
 
-        // Navigate to hash or default
-        const hash = location.hash.replace('#', '') || 'dashboard';
+        // Restore timecode generator state (survives page refresh)
+        if (typeof TimecodeGenPage !== 'undefined') {
+            TimecodeGenPage._loadSettings();
+            TimecodeGenPage._restoreState();
+        }
+
+        // Navigate to hash or default — also save to localStorage for persistence
+        const hash = location.hash.replace('#', '') || localStorage.getItem('luxor_last_page') || 'dashboard';
         this.navigate(hash);
 
-        // Populate server select but do NOT auto-connect on startup
+        // Auto-reconnect to last active server on startup
         const servers = appState.get('servers');
         const lastServerId = localStorage.getItem('luxor_last_server');
         const lastServer = lastServerId ? servers.find(s => s.id === lastServerId) : null;
         if (lastServer) {
             document.getElementById('server-select').value = lastServer.id;
+            // Save the page we want to stay on BEFORE reconnect overwrites it
+            this._startupPage = hash;
+            setTimeout(() => this.switchServer(lastServerId), 200);
+        } else {
+            // Hide nav until a server is connected
+            this.updateNavVisibility(null);
         }
 
-        // Hide nav until a server is connected
-        this.updateNavVisibility(null);
+        appState.log('INFO', 'Luxor Production v1.5 started', 'System');
 
-        appState.log('INFO', 'Luxor Production v1.4 started', 'System');
+        // First-time disclaimer popup
+        if (!localStorage.getItem('luxor_disclaimer_accepted')) {
+            this._showDisclaimer();
+        }
+    },
+
+    _showDisclaimer() {
+        const overlay = document.createElement('div');
+        overlay.id = 'luxor-disclaimer-overlay';
+        overlay.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,0.85);display:flex;align-items:center;justify-content:center;backdrop-filter:blur(8px);animation:luxorFadeIn 0.3s ease;';
+
+        overlay.innerHTML = `
+            <div style="
+                background:var(--card-bg, #1a1d23);
+                border:1px solid var(--border, #2a2d35);
+                border-radius:16px;
+                max-width:480px;
+                width:90%;
+                padding:40px 36px 32px;
+                text-align:center;
+                box-shadow:0 24px 80px rgba(0,0,0,0.6);
+                animation:luxorSlideUp 0.35s ease;
+            ">
+                <img src="assets/logos/luxor.png" alt="Luxor" style="width:90px;height:90px;margin:0 auto 20px;display:block;filter:drop-shadow(0 4px 12px rgba(245,158,11,0.3));">
+
+                <h2 style="margin:0 0 4px;font-size:22px;font-weight:800;color:var(--text-primary, #fff);letter-spacing:0.5px;">Luxor Production</h2>
+                <div style="font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#f59e0b;margin-bottom:20px;">Beta Software</div>
+
+                <div style="background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.2);border-radius:10px;padding:16px;margin-bottom:20px;text-align:left;">
+                    <p style="margin:0 0 10px;font-size:13px;color:var(--text-secondary, #ccc);line-height:1.6;">
+                        This application is currently <strong style="color:#f59e0b;">under active development</strong> and is provided as a beta version for testing and evaluation purposes.
+                    </p>
+                    <p style="margin:0 0 10px;font-size:13px;color:var(--text-secondary, #ccc);line-height:1.6;">
+                        Features may be incomplete, unstable, or change without notice. Some device integrations may not function as expected with all hardware configurations.
+                    </p>
+                    <p style="margin:0;font-size:13px;color:var(--text-secondary, #ccc);line-height:1.6;">
+                        By continuing, you acknowledge that you use this software <strong style="color:var(--text-primary, #fff);">at your own risk</strong>. No warranty is provided, and the developers are not liable for any issues arising from its use in production environments.
+                    </p>
+                </div>
+
+                <label style="display:flex;align-items:center;gap:10px;cursor:pointer;margin-bottom:20px;padding:10px 14px;border-radius:8px;border:1px solid var(--border, #2a2d35);background:var(--bg-secondary, #12141a);transition:border-color 0.15s;" id="luxor-accept-label">
+                    <input type="checkbox" id="luxor-accept-check" style="width:18px;height:18px;accent-color:#f59e0b;cursor:pointer;flex-shrink:0;">
+                    <span style="font-size:12px;color:var(--text-secondary, #ccc);text-align:left;line-height:1.4;">I understand this is beta software and accept the risks of using it</span>
+                </label>
+
+                <button id="luxor-accept-btn" disabled style="
+                    width:100%;padding:14px;border-radius:10px;border:none;
+                    font-size:14px;font-weight:700;cursor:not-allowed;
+                    background:#3a3a3a;color:#666;
+                    transition:all 0.2s ease;
+                " onclick="HippoApp._acceptDisclaimer()">
+                    Accept & Continue
+                </button>
+
+                <p style="margin:16px 0 0;font-size:10px;color:var(--text-muted, #666);">v1.5 Beta &mdash; Luxor Production Suite</p>
+            </div>
+        `;
+
+        document.body.appendChild(overlay);
+
+        // Enable button when checkbox is checked
+        const check = document.getElementById('luxor-accept-check');
+        const btn = document.getElementById('luxor-accept-btn');
+        const label = document.getElementById('luxor-accept-label');
+        check.addEventListener('change', () => {
+            if (check.checked) {
+                btn.disabled = false;
+                btn.style.cssText = 'width:100%;padding:14px;border-radius:10px;border:none;font-size:14px;font-weight:700;cursor:pointer;background:#f59e0b;color:#000;transition:all 0.2s ease;';
+                label.style.borderColor = '#f59e0b';
+            } else {
+                btn.disabled = true;
+                btn.style.cssText = 'width:100%;padding:14px;border-radius:10px;border:none;font-size:14px;font-weight:700;cursor:not-allowed;background:#3a3a3a;color:#666;transition:all 0.2s ease;';
+                label.style.borderColor = 'var(--border, #2a2d35)';
+            }
+        });
+
+        // Add animations
+        if (!document.getElementById('luxor-disclaimer-css')) {
+            const style = document.createElement('style');
+            style.id = 'luxor-disclaimer-css';
+            style.textContent = `
+                @keyframes luxorFadeIn { from { opacity: 0; } to { opacity: 1; } }
+                @keyframes luxorSlideUp { from { opacity: 0; transform: translateY(30px) scale(0.96); } to { opacity: 1; transform: translateY(0) scale(1); } }
+            `;
+            document.head.appendChild(style);
+        }
+    },
+
+    _acceptDisclaimer() {
+        localStorage.setItem('luxor_disclaimer_accepted', 'true');
+        const overlay = document.getElementById('luxor-disclaimer-overlay');
+        if (overlay) {
+            overlay.style.transition = 'opacity 0.25s ease';
+            overlay.style.opacity = '0';
+            setTimeout(() => overlay.remove(), 250);
+        }
     },
 
     // ================================================================
     // DOCK + PANEL NAVIGATION
     // ================================================================
     _categoryTitles: {
-        control: 'Engine Control', devices: 'Devices', led: 'LED Tools', tools: 'Tools',
-        network: 'Network', production: 'Production', '3d': '3D Tools', system: 'System'
+        devices: 'Devices', led: 'LED Tools', tools: 'Tools',
+        network: 'Network', production: 'Production', '3d': '3D Tools', system: 'Settings'
     },
 
     // Map page IDs to their category for auto-switching
     _pageToCategory: {
-        showrun: 'devices', dashboard: 'devices', status: 'devices', composition: 'control',
-        timelines: 'control', media: 'control', mixes: 'control', presets: 'control',
-        pins: 'control', timecode: 'control',
-        ledprocessor: 'devices', ptz: 'devices', netswitch: 'devices', lighting: 'devices', intercom: 'devices',
+        showrun: 'devices', dashboard: 'devices', status: 'devices',
+        composition: 'devices', timelines: 'devices', media: 'devices', mixes: 'devices',
+        presets: 'devices', pins: 'devices', timecode: 'devices',
+        ledprocessor: 'devices', ptz: 'devices', netswitch: 'devices', lighting: 'devices', intercom: 'devices', enginemedia: 'devices', enginemixing: 'devices',
         ledcalc: 'led', ledsetup: 'led', pixlgrid: 'led', ledconnect: 'led',
         timecodegen: 'tools', showclock: 'tools', macrobuilder: 'tools', oscrouter: 'tools',
         nethealth: 'network', ipam: 'network', dante: 'network', ndidiscovery: 'network',
@@ -138,6 +244,10 @@ const HippoApp = {
                 e.stopPropagation();
                 const cat = btn.dataset.category;
                 HippoApp.switchCategory(cat);
+                // Auto-navigate to settings when clicking the system dock icon
+                if (cat === 'system') {
+                    HippoApp.navigate('settings');
+                }
             });
         });
     },
@@ -176,7 +286,21 @@ const HippoApp = {
         document.querySelectorAll('.nav-item').forEach(link => {
             link.addEventListener('click', (e) => {
                 e.preventDefault();
+                const section = link.dataset.section;
+                if (section && link.dataset.page === 'settings') {
+                    SettingsPage._section = section;
+                }
+                // Reset Show Run sub-page when clicking the main Show Run nav (show all sections)
+                if (link.dataset.page === 'showrun' && !link.dataset.subpage) {
+                    ShowRunPage._activeSubPage = null;
+                }
                 this.navigate(link.dataset.page);
+                // Update active state for settings sub-items
+                if (section) {
+                    document.querySelectorAll('.nav-item[data-section]').forEach(l => {
+                        l.classList.toggle('active', l.dataset.section === section);
+                    });
+                }
             });
         });
 
@@ -196,6 +320,7 @@ const HippoApp = {
 
         appState.set('currentPage', page);
         location.hash = page;
+        localStorage.setItem('luxor_last_page', page);
 
         // Auto-switch dock category to match the page
         const cat = this._pageToCategory[page];
@@ -204,27 +329,20 @@ const HippoApp = {
         }
 
         // Update nav
-        document.querySelectorAll('.nav-item').forEach(l => l.classList.toggle('active', l.dataset.page === page));
+        document.querySelectorAll('.nav-item').forEach(l => {
+            if (l.dataset.section) {
+                // Settings sub-items: match by section
+                l.classList.toggle('active', page === 'settings' && l.dataset.section === SettingsPage._section);
+            } else {
+                l.classList.toggle('active', l.dataset.page === page);
+            }
+        });
 
-        // Update title
-        const titles = {
-            showrun: 'Show Run', dashboard: 'Dashboard', status: 'System Status',
-            composition: 'Composition', timelines: 'Timelines',
-            media: 'Media Library', mixes: 'Mixes & Layers', presets: 'Presets',
-            pins: 'Pin Control', ledprocessor: 'LED Processor', network: 'Network Config', dmx: 'DMX / Art-Net',
-            sync: 'Sync & Cluster', lighting: 'Lighting Console', intercom: 'Intercom', settings: 'Settings', logs: 'Event Log',
-            ledcalc: 'LED Calculator', ledsetup: 'LED Setup Calc', pixlgrid: 'PIXL Grid', ledconnect: 'LED Auto-Connect',
-            ptz: 'PTZ Cameras', netswitch: 'Network Switches',
-            nethealth: 'Network Health', ipam: 'IP Manager', dante: 'Dante / AES67',
-            timecodegen: 'Timecode Generator', showclock: 'Show Clock',
-            macrobuilder: 'Macro Builder', oscrouter: 'OSC Router',
-            ndidiscovery: 'NDI Discovery', sacnmonitor: 'sACN / Art-Net Monitor',
-            diagram: 'Diagram Builder', truckpack: 'Truck Packer', specifications: 'Specifications',
-            riggingcalc: 'Rigging Calculator', weighttracker: 'Weight Tracker',
-            power: 'Power Distribution', fixtures: 'Fixture Patch', captureview: 'Capture Viewer',
-            stage3d: '3D Stage Visualizer', ledpanel3d: '3D LED Layout',
-        };
-        document.getElementById('page-title').textContent = titles[page] || page;
+        // Clear ALL sidebar device selections (green border) — each page re-applies its own
+        document.querySelectorAll('.sidebar-device-card.selected').forEach(el => el.classList.remove('selected'));
+
+        // Re-render server list to update engine sub-nav active states
+        this.renderServerList();
 
         this.renderPage();
 
@@ -276,14 +394,100 @@ const HippoApp = {
         }
 
         const statuses = appState.get('serverStatuses') || {};
+        const currentPage = appState.get('currentPage');
+
+        // Engine control sub-pages by server type
+        const enginePages = {
+            hippo: [
+                { page: 'timelines', icon: 'fa-stream', label: 'Timelines' },
+                { page: 'media', icon: 'fa-photo-video', label: 'Media' },
+                { page: 'mixes', icon: 'fa-sliders-h', label: 'Mixes & Layers' },
+                { page: 'presets', icon: 'fa-bookmark', label: 'Presets' },
+                { page: 'pins', icon: 'fa-microchip', label: 'Pin Control' },
+                { page: 'timecode', icon: 'fa-clock', label: 'Timecode' },
+            ],
+            resolume: [
+                { page: 'composition', icon: 'fa-th', label: 'Composition' },
+                { page: 'enginemedia', icon: 'fa-photo-video', label: 'Media' },
+                { page: 'enginemixing', icon: 'fa-sliders-h', label: 'Layer Mixer' },
+            ],
+            vmix: [
+                { page: 'vmix-switching', icon: 'fa-tv', label: 'Switching' },
+                { page: 'vmix-audio', icon: 'fa-volume-up', label: 'Audio Mixer' },
+                { page: 'vmix-overlays', icon: 'fa-layer-group', label: 'Overlays' },
+                { page: 'vmix-replay', icon: 'fa-redo', label: 'Replay' },
+                { page: 'vmix-ptz', icon: 'fa-video', label: 'PTZ Control' },
+                { page: 'enginemedia', icon: 'fa-photo-video', label: 'Media' },
+                { page: 'enginemixing', icon: 'fa-sliders-h', label: 'Full Mixer' },
+            ],
+            obs: [
+                { page: 'obs-scenes', icon: 'fa-tv', label: 'Scenes' },
+                { page: 'obs-audio', icon: 'fa-volume-up', label: 'Audio Mixer' },
+                { page: 'obs-media', icon: 'fa-photo-video', label: 'Media Inputs' },
+                { page: 'enginemedia', icon: 'fa-photo-video', label: 'Media' },
+                { page: 'enginemixing', icon: 'fa-sliders-h', label: 'Full Mixer' },
+            ],
+            casparcg: [
+                { page: 'casparcg-channels', icon: 'fa-tv', label: 'Channels & Layers' },
+                { page: 'casparcg-media', icon: 'fa-photo-video', label: 'Media Library' },
+                { page: 'casparcg-templates', icon: 'fa-layer-group', label: 'Templates (CG)' },
+                { page: 'casparcg-mixer', icon: 'fa-sliders-h', label: 'Mixer Controls' },
+                { page: 'enginemedia', icon: 'fa-photo-video', label: 'Media' },
+                { page: 'enginemixing', icon: 'fa-sliders-h', label: 'Full Mixer' },
+            ],
+            barco: [
+                { page: 'barco-switching', icon: 'fa-tv', label: 'Destinations' },
+                { page: 'barco-presets', icon: 'fa-bookmark', label: 'Presets' },
+                { page: 'barco-aux', icon: 'fa-external-link-alt', label: 'AUX & Patterns' },
+                { page: 'barco-layers', icon: 'fa-layer-group', label: 'Layers' },
+                { page: 'barco-config', icon: 'fa-cog', label: 'System & I/O' },
+                { page: 'enginemixing', icon: 'fa-sliders-h', label: 'Full Mixer' },
+            ],
+            qlab: [
+                { page: 'qlab-cues', icon: 'fa-list-ol', label: 'Cue List' },
+                { page: 'qlab-active', icon: 'fa-play-circle', label: 'Active Cues' },
+                { page: 'qlab-direct', icon: 'fa-bolt', label: 'Direct Fire' },
+                { page: 'qlab-settings', icon: 'fa-cog', label: 'Workspace' },
+                { page: 'enginemixing', icon: 'fa-sliders-h', label: 'Audio Controls' },
+            ],
+            disguise: [
+                { page: 'disguise-tracks', icon: 'fa-stream', label: 'Tracks & Master' },
+                { page: 'disguise-sections', icon: 'fa-tags', label: 'Sections' },
+                { page: 'disguise-transport', icon: 'fa-clock', label: 'Transport & Go-To' },
+                { page: 'disguise-health', icon: 'fa-heartbeat', label: 'System Health' },
+                { page: 'enginemixing', icon: 'fa-sliders-h', label: 'Audio & Output' },
+            ],
+            pixera: [
+                { page: 'pixera-timelines', icon: 'fa-film', label: 'Timelines' },
+                { page: 'pixera-cues', icon: 'fa-bolt', label: 'Cue Triggers' },
+                { page: 'pixera-screens', icon: 'fa-desktop', label: 'Screens & Outputs' },
+                { page: 'pixera-resources', icon: 'fa-folder-open', label: 'Resources' },
+                { page: 'enginemedia', icon: 'fa-photo-video', label: 'Media' },
+                { page: 'enginemixing', icon: 'fa-sliders-h', label: 'Layers & Mixing' },
+            ],
+            atem: [
+                { page: 'atem-switching', icon: 'fa-tv', label: 'Program / Preview' },
+                { page: 'atem-keyers', icon: 'fa-layer-group', label: 'Keyers' },
+                { page: 'atem-aux', icon: 'fa-external-link-alt', label: 'AUX Outputs' },
+                { page: 'atem-macros', icon: 'fa-magic', label: 'Macros' },
+                { page: 'atem-audio', icon: 'fa-volume-up', label: 'Audio Mixer' },
+                { page: 'enginemedia', icon: 'fa-photo-video', label: 'Media Pool' },
+                { page: 'enginemixing', icon: 'fa-sliders-h', label: 'Full Mixer' },
+            ],
+        };
+
         container.innerHTML = servers.map(s => {
             const t = this._serverTypes[s.type] || this._serverTypes['hippo'];
             const isActive = s.id === activeId;
             const isOnline = isActive && connected;
             const wasOnline = statuses[s.id]?.online;
             const dotColor = isOnline ? '#4ade80' : isActive ? '#f59e0b' : wasOnline ? '#4ade80' : '#6b7280';
-            return `
-            <div class="sidebar-device-card ${isActive ? 'selected' : ''}" onclick="HippoApp.switchServer('${s.id}')" title="${isActive ? 'Connected' : 'Click to connect'}">
+            // Only show green selected border when user is on an engine-related page
+            const engineRelatedPages = ['showrun', 'dashboard', 'composition', 'timelines', 'media', 'mixes', 'presets', 'pins', 'timecode', 'status', 'enginemedia', 'enginemixing'];
+            const isOnEnginePage = isActive && engineRelatedPages.includes(currentPage);
+
+            let html = `
+            <div class="sidebar-device-card ${isOnEnginePage ? 'selected' : ''}" onclick="HippoApp.switchServer('${s.id}')" title="${isActive ? 'Connected' : 'Click to connect'}">
                 <span class="device-dot" style="background:${dotColor}"></span>
                 <div class="device-info">
                     <div class="device-name">${UI.esc(s.name)}</div>
@@ -293,6 +497,25 @@ const HippoApp = {
                     <i class="fas fa-times"></i>
                 </button>
             </div>`;
+
+            // Show engine control sub-pages under the connected server
+            if (isOnline && enginePages[s.type]) {
+                html += `<div class="engine-sub-nav">`;
+                html += enginePages[s.type].map(p => {
+                    // For Hippo/Resolume, these are real pages. For other engines, they navigate to showrun with a view.
+                    const isEngineView = p.page.includes('-');
+                    const isActive = isEngineView ? (currentPage === 'showrun' && ShowRunPage._activeSubPage === p.page) : (currentPage === p.page);
+                    const clickHandler = isEngineView
+                        ? `event.preventDefault();ShowRunPage._activeSubPage='${p.page}';HippoApp.navigate('showrun');`
+                        : `event.preventDefault();HippoApp.navigate('${p.page}');`;
+                    return `<a href="#${p.page}" class="nav-item engine-sub-item ${isActive ? 'active' : ''}" data-page="${isEngineView ? 'showrun' : p.page}" data-subpage="${p.page}" onclick="${clickHandler}">
+                        <i class="fas ${p.icon}"></i><span>${p.label}</span>
+                    </a>`;
+                }).join('');
+                html += `</div>`;
+            }
+
+            return html;
         }).join('');
     },
 
@@ -319,13 +542,38 @@ const HippoApp = {
     },
 
     switchServer(serverId) {
-        if (serverId) this.connectToServer(serverId);
-        else this.disconnect();
+        if (!serverId) { this.disconnect(); return; }
+
+        // If already connected to this server, stay on current page
+        // (don't yank the user away from LED processors, PTZ, etc.)
+        const activeId = appState.get('activeServerId');
+        const connected = appState.get('connected');
+        if (serverId === activeId && connected) {
+            // Just make sure sidebar is visible — don't navigate away
+            if (this._activeCategory !== 'devices') {
+                this.switchCategory('devices');
+            }
+            this.renderServerList();
+            return;
+        }
+
+        this.connectToServer(serverId);
     },
 
     async connectToServer(serverId) {
         const server = appState.get('servers').find(s => s.id === serverId);
         if (!server) { UI.toast('Server not found', 'error'); return; }
+
+        // If already connected to this server, stay on current page
+        const activeId = appState.get('activeServerId');
+        const alreadyConnected = appState.get('connected');
+        if (serverId === activeId && alreadyConnected) {
+            if (this._activeCategory !== 'devices') {
+                this.switchCategory('devices');
+            }
+            this.renderServerList();
+            return;
+        }
 
         // Disconnect existing
         this.disconnect();
@@ -443,46 +691,29 @@ const HippoApp = {
                         if (inputResp) appState.set('obsInputs', inputResp.inputs || inputResp);
                     }
                     break;
-                case 'barco':
-                    if (health.info._presets) {
-                        appState.set('barcoPresets', health.info._presets);
-                        appState.set('barcoDestinations', health.info._destinations || []);
-                        appState.set('barcoSources', health.info._sources || []);
-                    }
+                case 'barco': {
+                    const barcoState = await barcoAPI.getState().catch(() => null);
+                    if (barcoState) appState.set('barcoState', barcoState);
                     break;
+                }
                 case 'qlab': {
-                    const ws = await qlabAPI.getWorkspaces().catch(() => null);
-                    if (ws && ws.length > 0) {
-                        appState.set('qlabWorkspaces', ws);
-                        appState.set('qlabActiveWorkspace', ws[0].uniqueID || ws[0].id);
-                        const cues = await qlabAPI.getCueList(ws[0].uniqueID || ws[0].id).catch(() => null);
-                        if (cues) appState.set('qlabCueLists', cues);
-                    }
+                    const qlabState = await qlabAPI.getState().catch(() => null);
+                    if (qlabState) appState.set('qlabState', qlabState);
                     break;
                 }
                 case 'disguise': {
-                    const tracks = await disguiseAPI.getTracks().catch(() => null);
-                    if (tracks) appState.set('disguiseTracks', tracks);
-                    const transport = await disguiseAPI.getTransportStatus().catch(() => null);
-                    if (transport) appState.set('disguiseTransport', transport);
-                    const sections = await disguiseAPI.getSections().catch(() => null);
-                    if (sections) appState.set('disguiseSections', sections);
-                    const machines = await disguiseAPI.getMachines().catch(() => null);
-                    if (machines) appState.set('disguiseMachines', machines);
+                    const disguiseState = await disguiseAPI.getState().catch(() => null);
+                    if (disguiseState) appState.set('disguiseState', disguiseState);
                     break;
                 }
                 case 'pixera': {
-                    const timelines = await pixeraAPI.getTimelines().catch(() => null);
-                    if (timelines) appState.set('pixeraTimelines', timelines);
-                    const screens = await pixeraAPI.getScreens().catch(() => null);
-                    if (screens) appState.set('pixeraScreens', screens);
+                    const pixeraState = await pixeraAPI.getState().catch(() => null);
+                    if (pixeraState) appState.set('pixeraState', pixeraState);
                     break;
                 }
                 case 'atem': {
-                    const inputs = await atemAPI.getInputs().catch(() => null);
-                    if (inputs) appState.set('atemInputs', inputs);
-                    const audio = await atemAPI.getAudioMixer().catch(() => null);
-                    if (audio) appState.set('atemAudio', audio);
+                    const atemState = await atemAPI.getState().catch(() => null);
+                    if (atemState) appState.set('atemState', atemState);
                     break;
                 }
                 default:
@@ -525,18 +756,26 @@ const HippoApp = {
             // Start polling
             this.startPolling();
 
-            // Navigate to appropriate default page
-            const currentPage = appState.get('currentPage');
-            if (serverType === 'resolume' && this._hippoPages.includes(currentPage)) {
+            // Navigate — on startup reconnect, stay on whatever page the user was on
+            // Otherwise go to the engine's default page
+            const restoredPage = this._startupPage;
+            this._startupPage = null;  // clear so it only applies once
+            if (restoredPage && this.pages[restoredPage]) {
+                // Startup reconnect — stay on the page from URL hash / localStorage
+                this.navigate(restoredPage);
+            } else if (ShowRunPage._returnToShowRun) {
+                ShowRunPage._returnToShowRun = false;
+                this.navigate('showrun');
+            } else if (serverType === 'resolume') {
                 this.navigate('composition');
-            } else if (this._hippoPages.includes(currentPage) && serverType !== 'hippo') {
-                this.navigate('dashboard');
-            } else if (this._resolumePages.includes(currentPage) && serverType !== 'resolume') {
+            } else if (serverType === 'hippo') {
                 this.navigate('dashboard');
             } else {
-                this.renderPage();
-                if (this._currentPageObj?.onActivate) this._currentPageObj.onActivate();
+                // All other engines: go directly to Show Run
+                this.navigate('showrun');
             }
+            // Re-render server list to show selected state
+            this.renderServerList();
 
         } catch (e) {
             appState.set('connected', false);
@@ -618,18 +857,11 @@ const HippoApp = {
         appState.set('obsPreviewScene', null);
         appState.set('obsInputs', null);
         appState.set('obsStreamStatus', null);
-        appState.set('barcoPresets', null);
-        appState.set('barcoDestinations', null);
-        appState.set('barcoSources', null);
-        appState.set('qlabWorkspaces', null);
-        appState.set('qlabActiveWorkspace', null);
-        appState.set('qlabCueLists', null);
-        appState.set('disguiseTracks', null);
-        appState.set('disguiseTransport', null);
-        appState.set('disguiseSections', null);
-        appState.set('disguiseMachines', null);
-        appState.set('pixeraTimelines', null);
-        appState.set('pixeraScreens', null);
+        appState.set('barcoState', null);
+        appState.set('qlabState', null);
+        appState.set('disguiseState', null);
+        appState.set('pixeraState', null);
+        appState.set('atemState', null);
         this.setConnectionStatus('disconnected', 'OFFLINE');
         document.getElementById('engine-status-text').textContent = '--';
         document.getElementById('media-status-text').textContent = '--';
@@ -641,6 +873,14 @@ const HippoApp = {
         document.getElementById('ws-badge').classList.remove('connected');
         this.updateNavVisibility(null);
         this.renderPage();
+    },
+
+    /** Go to the home dashboard — disconnects from any active server first */
+    goHome() {
+        if (appState.get('connected') || appState.get('activeServerId')) {
+            this.disconnect();
+        }
+        this.navigate('dashboard');
     },
 
     async fetchInitialData() {
@@ -711,42 +951,34 @@ const HippoApp = {
                     break;
                 }
                 case 'barco': {
-                    const presets = await barcoAPI.listPresets().catch(() => null);
-                    if (presets) appState.set('barcoPresets', presets);
+                    const barcoState = await barcoAPI.getState().catch(() => null);
+                    if (barcoState) appState.set('barcoState', barcoState);
                     break;
                 }
                 case 'qlab': {
-                    const wsId = appState.get('qlabActiveWorkspace');
-                    if (wsId) {
-                        const cues = await qlabAPI.getCueList(wsId).catch(() => null);
-                        if (cues) appState.set('qlabCueLists', cues);
-                    }
+                    const qlabState = await qlabAPI.getState().catch(() => null);
+                    if (qlabState) appState.set('qlabState', qlabState);
                     break;
                 }
                 case 'disguise': {
-                    const transport = await disguiseAPI.getTransportStatus().catch(() => null);
-                    if (transport) appState.set('disguiseTransport', transport);
+                    const disguiseState = await disguiseAPI.getState().catch(() => null);
+                    if (disguiseState) appState.set('disguiseState', disguiseState);
                     break;
                 }
                 case 'pixera': {
-                    const timelines = await pixeraAPI.getTimelines().catch(() => null);
-                    if (timelines) appState.set('pixeraTimelines', timelines);
+                    const pixeraState = await pixeraAPI.getState().catch(() => null);
+                    if (pixeraState) appState.set('pixeraState', pixeraState);
                     break;
                 }
                 case 'atem': {
-                    const atemInfo = await atemAPI.getDeviceInfo().catch(() => null);
-                    if (atemInfo) {
-                        appState.set('atemState', {
-                            ...atemInfo,
-                            program: atemInfo.program ?? appState.get('atemState')?.program,
-                            preview: atemInfo.preview ?? appState.get('atemState')?.preview,
-                        });
-                    }
+                    const atemState = await atemAPI.getState().catch(() => null);
+                    if (atemState) appState.set('atemState', atemState);
                     break;
                 }
                 default: {
-                    const info = await hippoAPI.getInfo();
+                    const info = await hippoAPI.getFullStatus();
                     appState.set('serverInfo', info);
+                    if (info._components) appState.set('componentStatuses', info._components);
                     this.updateTopbarStatus(info);
                     this.updateEngineFooter(info);
                     break;
@@ -873,7 +1105,7 @@ const HippoApp = {
     // NAV VISIBILITY — show/hide pages based on server type
     // ================================================================
     // Pages that are always visible (even when disconnected)
-    _alwaysVisiblePages: ['showrun', 'dashboard', 'settings', 'logs', 'status', 'ledprocessor', 'ledcalc', 'ledsetup', 'pixlgrid', 'diagram', 'ledconnect', 'ptz', 'netswitch', 'lighting', 'intercom', 'stage3d', 'ledpanel3d', 'power', 'fixtures', 'truckpack', 'captureview', 'nethealth', 'ipam', 'dante', 'timecodegen', 'specifications', 'oscrouter', 'macrobuilder', 'ndidiscovery', 'riggingcalc', 'weighttracker', 'sacnmonitor', 'showclock'],
+    _alwaysVisiblePages: ['showrun', 'dashboard', 'settings', 'logs', 'status', 'ledprocessor', 'ledcalc', 'ledsetup', 'pixlgrid', 'diagram', 'ledconnect', 'ptz', 'netswitch', 'lighting', 'intercom', 'stage3d', 'ledpanel3d', 'power', 'fixtures', 'truckpack', 'captureview', 'nethealth', 'ipam', 'dante', 'timecodegen', 'specifications', 'oscrouter', 'macrobuilder', 'ndidiscovery', 'riggingcalc', 'weighttracker', 'sacnmonitor', 'showclock', 'enginemedia', 'enginemixing'],
 
     updateNavVisibility(serverType) {
         document.querySelectorAll('.nav-item').forEach(item => {
@@ -972,10 +1204,6 @@ const HippoApp = {
             delete document.documentElement.dataset.theme;
         }
         localStorage.setItem('luxor_theme', newTheme);
-        const icon = document.querySelector('#theme-toggle i');
-        if (icon) {
-            icon.className = newTheme === 'light' ? 'fas fa-sun' : 'fas fa-moon';
-        }
     },
 
     toggleSidebar() {
@@ -1452,13 +1680,14 @@ const HippoApp = {
 
     async qlabAction(action) {
         if (!appState.get('connected')) { UI.toast('Not connected', 'warning'); return; }
+        const wsId = appState.get('qlabState')?.workspaceId;
         try {
             switch (action) {
-                case 'go':     await qlabAPI.go(); UI.toast('GO', 'success'); break;
-                case 'stop':   await qlabAPI.stop(); UI.toast('Stop', 'info'); break;
-                case 'pause':  await qlabAPI.pause(); UI.toast('Paused', 'info'); break;
-                case 'resume': await qlabAPI.resume(); UI.toast('Resume', 'success'); break;
-                case 'panic':  await qlabAPI.panic(); UI.toast('PANIC — All stopped', 'warning'); break;
+                case 'go':     await qlabAPI.go(wsId); UI.toast('GO', 'success'); break;
+                case 'stop':   await qlabAPI.stop(wsId); UI.toast('Stop', 'info'); break;
+                case 'pause':  await qlabAPI.pause(wsId); UI.toast('Paused', 'info'); break;
+                case 'resume': await qlabAPI.resume(wsId); UI.toast('Resume', 'success'); break;
+                case 'panic':  await qlabAPI.panic(wsId); UI.toast('PANIC — All stopped', 'warning'); break;
             }
             this.refreshDashboard();
         } catch (e) { UI.toast(e.message, 'error'); }
@@ -1471,7 +1700,7 @@ const HippoApp = {
                 case 'cut':       await barcoAPI.cut(); UI.toast('Cut', 'success'); break;
                 case 'dissolve':  await barcoAPI.dissolve(); UI.toast('Dissolve', 'success'); break;
                 case 'freezeAll':
-                    const dests = appState.get('barcoDestinations') || [];
+                    const dests = appState.get('barcoState')?.destinations || [];
                     for (const d of dests) await barcoAPI.freezeDestination(d.id);
                     UI.toast('All frozen', 'info');
                     break;
@@ -1644,6 +1873,7 @@ const HippoApp = {
             LedProcessorPage.selectProcessor(id);
         }
         this.navigate('ledprocessor');
+        this.renderLedProcessorList();
     },
 
     removeLedProcessor(id) {
@@ -1693,8 +1923,10 @@ const HippoApp = {
             return;
         }
 
+        const activeId = (typeof LedProcessorPage !== 'undefined' && LedProcessorPage._activeProc) ? LedProcessorPage._activeProc.id : null;
+        const onLedPage = appState.get('currentPage') === 'ledprocessor';
         container.innerHTML = procs.map(p => `
-            <div class="sidebar-device-card" onclick="HippoApp.selectLedProcessor('${p.id}')" title="Click to open ${UI.esc(p.name)}">
+            <div class="sidebar-device-card ${onLedPage && p.id === activeId ? 'selected' : ''}" onclick="HippoApp.selectLedProcessor('${p.id}')" title="Click to open ${UI.esc(p.name)}">
                 <span class="device-dot" style="background:${p.online ? '#4ade80' : '#ef4444'}"></span>
                 <div class="device-info">
                     <div class="device-name">${UI.esc(p.name)}</div>

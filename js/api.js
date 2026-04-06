@@ -270,6 +270,72 @@ class HippoAPI {
     }
 
     // ================================================================
+    // COMPONENT STATUS (via Pin API)
+    // Hippotizer exposes component status as string pins.
+    // States: Config, Run, Limited, Problem
+    // ================================================================
+
+    /**
+     * Get component status for a named component.
+     * Uses the pin tree to query real-time component health.
+     * @param {string} componentPath - e.g. "Engine", "DMX2", "Sync", "Output Manager", "MediaManager"
+     * @returns {Promise<{state: string, message: string}>}
+     */
+    async getComponentStatus(componentPath) {
+        try {
+            const raw = await this.getPinValue(componentPath.replace(/\\/g, '_') + '_Status');
+            if (typeof raw === 'string') {
+                // Parse status format: "System Status=run,Message=Running"
+                const parts = {};
+                raw.split(',').forEach(kv => {
+                    const [k, v] = kv.split('=');
+                    if (k && v) parts[k.trim()] = v.trim();
+                });
+                return { state: parts['System Status'] || raw, message: parts['Message'] || '' };
+            }
+            return { state: 'unknown', message: String(raw) };
+        } catch {
+            return { state: 'unreachable', message: '' };
+        }
+    }
+
+    /**
+     * Get all key component statuses in a single batch call.
+     * @returns {Promise<Object>} { engine, mediaManager, dmx, sync, outputManager }
+     */
+    async getAllComponentStatuses() {
+        const [engine, media, dmx, sync, output] = await Promise.allSettled([
+            this.getComponentStatus('Engine'),
+            this.getComponentStatus('MediaManager'),
+            this.getComponentStatus('DMX2'),
+            this.getComponentStatus('Sync'),
+            this.getComponentStatus('Output Manager'),
+        ]);
+        return {
+            engine: engine.status === 'fulfilled' ? engine.value : { state: 'error' },
+            mediaManager: media.status === 'fulfilled' ? media.value : { state: 'error' },
+            dmx: dmx.status === 'fulfilled' ? dmx.value : { state: 'error' },
+            sync: sync.status === 'fulfilled' ? sync.value : { state: 'error' },
+            outputManager: output.status === 'fulfilled' ? output.value : { state: 'error' },
+        };
+    }
+
+    /**
+     * Get full server info + component statuses in one call.
+     * Optimized for dashboard polling — gets everything needed in parallel.
+     * @returns {Promise<Object>}
+     */
+    async getFullStatus() {
+        const [info, components] = await Promise.allSettled([
+            this.getInfo(),
+            this.getAllComponentStatuses(),
+        ]);
+        const result = info.status === 'fulfilled' ? { ...info.value } : {};
+        result._components = components.status === 'fulfilled' ? components.value : {};
+        return result;
+    }
+
+    // ================================================================
     // HEALTH CHECK (convenience)
     // ================================================================
     async healthCheck() {

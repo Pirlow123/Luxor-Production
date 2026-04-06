@@ -6,24 +6,8 @@ const SettingsPage = {
 
     render() {
         return `
-            <div class="settings-layout">
-                <div class="settings-nav">
-                    ${['project','servers','api','companion','display','about'].map(s => `
-                        <button class="settings-nav-item ${this._section === s ? 'active' : ''}" onclick="SettingsPage.showSection('${s}')">
-                            <i class="fas fa-${
-                                s === 'project' ? 'folder-open' :
-                                s === 'servers' ? 'server' :
-                                s === 'api' ? 'plug' :
-                                s === 'companion' ? 'gamepad' :
-                                s === 'display' ? 'desktop' : 'info-circle'
-                            }"></i>
-                            <span>${s === 'api' ? 'API' : s.charAt(0).toUpperCase() + s.slice(1)}</span>
-                        </button>
-                    `).join('')}
-                </div>
-                <div class="settings-content" id="settings-content">
-                    ${this._renderSection()}
-                </div>
+            <div class="settings-content" id="settings-content">
+                ${this._renderSection()}
             </div>
         `;
     },
@@ -32,9 +16,9 @@ const SettingsPage = {
         this._section = s;
         const el = document.getElementById('settings-content');
         if (el) el.innerHTML = this._renderSection();
-        document.querySelectorAll('.settings-nav-item').forEach(b => {
-            const label = b.textContent.trim().toLowerCase();
-            b.classList.toggle('active', label === s || (s === 'api' && label === 'api'));
+        // Update sidebar nav active state
+        document.querySelectorAll('.nav-item[data-section]').forEach(l => {
+            l.classList.toggle('active', l.dataset.section === s);
         });
     },
 
@@ -42,6 +26,8 @@ const SettingsPage = {
         switch (this._section) {
             case 'project': return this._projectSection();
             case 'servers': return this._serversSection();
+            case 'network': return this._networkSection();
+            case 'cluster': return this._clusterSection();
             case 'api': return this._apiSection();
             case 'companion': return this._companionSection();
             case 'display': return this._displaySection();
@@ -109,6 +95,171 @@ const SettingsPage = {
                 </div>
             </div>
         `;
+    },
+
+    // ================================================================
+    // NETWORK & NTP — moved from Network Config page
+    // ================================================================
+    _networkSection() {
+        const cfg = appState.get('networkConfig');
+        const g = cfg.general;
+        return `
+            <div class="section-header">
+                <h2><i class="fas fa-globe"></i> Network & NTP</h2>
+                <button class="btn btn-sm btn-primary" onclick="SettingsPage.saveNetworkSettings()"><i class="fas fa-save"></i> Save</button>
+            </div>
+            <div class="network-grid">
+                <div class="card">
+                    <div class="card-header"><h3><i class="fas fa-globe"></i> Network Interfaces</h3></div>
+                    <div class="card-body">
+                        ${UI.formGroup('HOSTNAME', '<input class="form-control" id="net-hostname" value="' + UI.esc(g.hostname) + '" placeholder="Auto-detect">')}
+                        ${UI.formGroup('PRIMARY INTERFACE', UI.select('net-primary-iface', [{value:'auto',label:'Auto-detect'},{value:'eth0',label:'eth0'},{value:'eth1',label:'eth1'}], g.primaryInterface))}
+                        ${UI.formGroup('MTU SIZE', '<input class="form-control" type="number" id="net-mtu" value="' + g.mtu + '" min="576" max="9000">', 'Default: 1500. Use 9000 for jumbo frames')}
+                        ${UI.formGroup('QOS PRIORITY', UI.select('net-qos', ['normal','high','realtime'], g.qos))}
+                        ${UI.formGroup('BANDWIDTH LIMIT (MBPS)', '<input class="form-control" type="number" id="net-bw" value="' + g.bandwidthLimit + '" min="0">', '0 = unlimited')}
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-header"><h3><i class="fas fa-clock"></i> Time Sync (NTP)</h3></div>
+                    <div class="card-body">
+                        <div class="form-inline mb-md">
+                            <span style="font-size:12px">NTP Enabled</span>
+                            ${UI.toggle('net-ntp-enabled', g.ntpEnabled)}
+                        </div>
+                        ${UI.formGroup('NTP SERVER', '<input class="form-control mono" id="net-ntp-server" value="' + UI.esc(g.ntpServer) + '">')}
+                        <p style="color:var(--text-muted);font-size:11px;margin-top:12px;">
+                            NTP synchronises clocks across all machines on your show network. Use a local NTP server for best accuracy.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        `;
+    },
+
+    saveNetworkSettings() {
+        const cfg = appState.get('networkConfig');
+        cfg.general.hostname = document.getElementById('net-hostname')?.value ?? cfg.general.hostname;
+        cfg.general.primaryInterface = document.getElementById('net-primary-iface')?.value ?? cfg.general.primaryInterface;
+        cfg.general.mtu = parseInt(document.getElementById('net-mtu')?.value) || cfg.general.mtu;
+        cfg.general.qos = document.getElementById('net-qos')?.value ?? cfg.general.qos;
+        cfg.general.bandwidthLimit = parseInt(document.getElementById('net-bw')?.value) || 0;
+        cfg.general.ntpEnabled = document.getElementById('net-ntp-enabled')?.checked ?? cfg.general.ntpEnabled;
+        cfg.general.ntpServer = document.getElementById('net-ntp-server')?.value ?? cfg.general.ntpServer;
+        appState.setNetworkConfig(cfg);
+        UI.toast('Network settings saved', 'success');
+        appState.log('INFO', 'Network settings updated', 'Settings');
+    },
+
+    // ================================================================
+    // CLUSTER & SYNC — moved from Sync & Cluster page
+    // ================================================================
+    _clusterSection() {
+        const cfg = appState.get('networkConfig');
+        const h = cfg.hipponet;
+        const servers = appState.get('servers');
+        const statuses = appState.get('serverStatuses');
+        const connected = appState.get('connected');
+
+        return `
+            <div class="section-header">
+                <h2><i class="fas fa-project-diagram"></i> Cluster & Sync</h2>
+                <div class="flex gap-sm">
+                    <button class="btn btn-sm btn-primary" onclick="SettingsPage.saveClusterSettings()"><i class="fas fa-save"></i> Save</button>
+                    ${connected ? '<button class="btn btn-sm btn-accent" onclick="SettingsPage.triggerSync()"><i class="fas fa-sync-alt"></i> Sync Media Now</button>' : ''}
+                </div>
+            </div>
+
+            <!-- Cluster Node Overview -->
+            <div class="card">
+                <div class="card-header"><h3><i class="fas fa-server"></i> Cluster Nodes</h3></div>
+                <div class="card-body">
+                    <div class="cluster-grid" style="display:flex;flex-wrap:wrap;gap:10px;">
+                        ${servers.map(s => {
+                            const st = statuses[s.id];
+                            const online = st?.online;
+                            return '<div class="server-node ' + (online ? 'online' : 'offline') + '" style="min-width:140px;padding:12px;border:1px solid var(--border-color);border-radius:var(--radius);background:var(--bg-secondary);">' +
+                                '<div style="display:flex;align-items:center;gap:8px;">' +
+                                    '<i class="fas fa-server" style="color:var(--text-muted);"></i>' +
+                                    '<div><div style="font-weight:700;font-size:12px;">' + UI.esc(s.name) + '</div>' +
+                                    '<div class="mono" style="font-size:10px;color:var(--text-muted);">' + UI.esc(s.host) + ':' + s.port + '</div></div>' +
+                                '</div>' +
+                                '<div style="text-align:center;padding:4px;margin-top:6px;">' + (online ? UI.badge('ONLINE', 'green') : UI.badge('OFFLINE', 'red')) + '</div>' +
+                            '</div>';
+                        }).join('')}
+                        ${servers.length === 0 ? '<p class="text-muted">No servers configured. Add servers in the Servers section.</p>' : ''}
+                    </div>
+                </div>
+            </div>
+
+            <!-- HippoNet Configuration -->
+            <div class="card mt-md">
+                <div class="card-header">
+                    <h3><i class="fas fa-project-diagram"></i> HippoNet Configuration</h3>
+                    <div class="form-inline">${UI.toggle('hn-enabled', h.enabled)} <span style="font-size:11px">Enabled</span></div>
+                </div>
+                <div class="card-body">
+                    <div class="form-row">
+                        ${UI.formGroup('INTERFACE', UI.select('hn-iface', [{value:'auto',label:'Auto'},{value:'eth0',label:'eth0'},{value:'eth1',label:'eth1'}], h.interface))}
+                        ${UI.formGroup('PORT', '<input class="form-control" type="number" id="hn-port" value="' + h.port + '" min="1" max="65535">')}
+                        ${UI.formGroup('MAX NODES', '<input class="form-control" type="number" id="hn-maxnodes" value="' + h.maxNodes + '" min="1" max="256">')}
+                    </div>
+                    <div class="form-row">
+                        ${UI.formGroup('MASTER IP', '<input class="form-control mono" id="hn-master" value="' + UI.esc(h.masterIp) + '" placeholder="Auto-elect">', 'Leave empty for auto-election')}
+                        ${UI.formGroup('HEARTBEAT (S)', '<input class="form-control" type="number" id="hn-heartbeat" value="' + h.heartbeat + '" min="1">')}
+                        ${UI.formGroup('TIMEOUT (S)', '<input class="form-control" type="number" id="hn-timeout" value="' + h.timeout + '" min="5">')}
+                    </div>
+                    <div class="flex gap-md mt-sm">
+                        <div class="form-inline">${UI.toggle('hn-discovery', h.discovery)} <span style="font-size:11px">Auto Discovery</span></div>
+                        <div class="form-inline">${UI.toggle('hn-sync', h.syncEnabled)} <span style="font-size:11px">Sync Enabled</span></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sync Operations -->
+            <div class="card mt-md">
+                <div class="card-header"><h3><i class="fas fa-exchange-alt"></i> Sync Operations</h3></div>
+                <div class="card-body">
+                    <p style="color:var(--text-secondary);font-size:12px;margin-bottom:12px">
+                        Trigger media sync to push all media files from the active server to all other Hippotizer nodes on the HippoNet network.
+                    </p>
+                    <div class="flex gap-sm">
+                        <button class="btn btn-primary" onclick="SettingsPage.triggerSync()" ${!connected ? 'disabled' : ''}>
+                            <i class="fas fa-cloud-upload-alt"></i> Sync Media to All Nodes
+                        </button>
+                        <button class="btn" onclick="StatusPage.refreshAll()"><i class="fas fa-sync-alt"></i> Refresh Status</button>
+                    </div>
+                    <div id="sync-log" class="mt-md"></div>
+                </div>
+            </div>
+        `;
+    },
+
+    saveClusterSettings() {
+        const cfg = appState.get('networkConfig');
+        cfg.hipponet.enabled = document.getElementById('hn-enabled')?.checked ?? cfg.hipponet.enabled;
+        cfg.hipponet.interface = document.getElementById('hn-iface')?.value ?? cfg.hipponet.interface;
+        cfg.hipponet.port = parseInt(document.getElementById('hn-port')?.value) || cfg.hipponet.port;
+        cfg.hipponet.maxNodes = parseInt(document.getElementById('hn-maxnodes')?.value) || cfg.hipponet.maxNodes;
+        cfg.hipponet.masterIp = document.getElementById('hn-master')?.value ?? cfg.hipponet.masterIp;
+        cfg.hipponet.heartbeat = parseInt(document.getElementById('hn-heartbeat')?.value) || cfg.hipponet.heartbeat;
+        cfg.hipponet.timeout = parseInt(document.getElementById('hn-timeout')?.value) || cfg.hipponet.timeout;
+        cfg.hipponet.discovery = document.getElementById('hn-discovery')?.checked ?? cfg.hipponet.discovery;
+        cfg.hipponet.syncEnabled = document.getElementById('hn-sync')?.checked ?? cfg.hipponet.syncEnabled;
+        appState.setNetworkConfig(cfg);
+        UI.toast('Cluster settings saved', 'success');
+        appState.log('INFO', 'Cluster settings updated', 'Settings');
+    },
+
+    async triggerSync() {
+        try {
+            await hippoAPI.syncMedia();
+            UI.toast('Media sync triggered successfully', 'success');
+            appState.log('INFO', 'Media sync triggered to network', 'Sync');
+            const log = document.getElementById('sync-log');
+            if (log) log.innerHTML = '<div class="badge badge-green" style="font-size:12px;padding:6px 10px"><i class="fas fa-check"></i> Sync initiated at ' + new Date().toLocaleTimeString() + '</div>';
+        } catch(e) {
+            UI.toast('Sync failed: ' + e.message, 'error');
+        }
     },
 
     _apiSection() {
@@ -506,8 +657,14 @@ const SettingsPage = {
             <div class="card">
                 <div class="card-header"><h3><i class="fas fa-desktop"></i> Display Settings</h3></div>
                 <div class="card-body">
-                    <div class="form-inline mb-md">
-                        <span style="font-size:12px">Collapsed Sidebar</span>
+                    <div class="form-inline mb-md" style="display:flex;align-items:center;gap:8px;padding:6px 8px;background:var(--bg-secondary);border-radius:var(--radius-sm);border:1px solid var(--border)">
+                        <i class="fas ${(localStorage.getItem('luxor_theme') || 'dark') === 'light' ? 'fa-sun' : 'fa-moon'}" style="font-size:12px;color:var(--text-muted);width:16px;text-align:center"></i>
+                        <span style="font-size:12px;flex:1">Dark / Light Theme</span>
+                        ${UI.toggle('setting-theme', (localStorage.getItem('luxor_theme') || 'dark') === 'light', "HippoApp.toggleTheme(); SettingsPage._section === 'display' && SettingsPage.refresh()")}
+                    </div>
+                    <div class="form-inline mb-md" style="display:flex;align-items:center;gap:8px;padding:6px 8px;background:var(--bg-secondary);border-radius:var(--radius-sm);border:1px solid var(--border)">
+                        <i class="fas fa-columns" style="font-size:12px;color:var(--text-muted);width:16px;text-align:center"></i>
+                        <span style="font-size:12px;flex:1">Collapsed Sidebar</span>
                         ${UI.toggle('setting-sidebar', appState.get('sidebarCollapsed'), "HippoApp.toggleSidebar()")}
                     </div>
                 </div>
@@ -626,7 +783,7 @@ const SettingsPage = {
                         LED, PTZ, Network, Lighting, Intercom, 3D Visualization
                     </p>
                     <div class="mt-md" style="font-size:11px;color:var(--text-muted)">
-                        <p>Version: 1.3</p>
+                        <p>Version: 1.5</p>
                     </div>
                 </div>
             </div>

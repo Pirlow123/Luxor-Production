@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 60">
+  <!-- Panasonic logo - clean corporate sans-serif -->
+  <text x="100" y="37" font-family="'Segoe UI', 'Helvetica Neue', Arial, sans-serif" font-size="26" font-weight="700" fill="#ffffff" text-anchor="middle" letter-spacing="3">Panasonic</text>
+  <!-- Subtle underline accent -->
+  <rect x="25" y="46" width="150" height="1.5" fill="#ffffff" opacity="0.3" rx="0.75"/>
+</svg>

@@ -714,10 +714,12 @@ const IntercomPage = {
             container.innerHTML = '';
             return;
         }
+        const onPage = (typeof appState !== 'undefined') && appState.get('currentPage') === 'intercom';
         container.innerHTML = this._systems.map(s => {
             const dot = s.connected ? '#4ade80' : '#ef4444';
+            const sel = onPage && s.id === this._selectedId ? 'selected' : '';
             return `
-                <div class="sidebar-device-card" onclick="IntercomPage.selectSystem('${s.id}');HippoApp.navigate('intercom')">
+                <div class="sidebar-device-card ${sel}" onclick="IntercomPage.selectSystem('${s.id}');HippoApp.navigate('intercom')">
                     <span class="device-dot" style="background:${dot}"></span>
                     <div class="device-info">
                         <div class="device-name">${UI.esc(s.name)}</div>

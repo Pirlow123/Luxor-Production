@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 60">
+  <!-- Riedel logo - red text with stylized R icon -->
+  <!-- Stylized R icon with vertical bars -->
+  <g transform="translate(18, 12)" fill="#c41e2a">
+    <!-- Vertical bars -->
+    <rect x="0" y="0" width="4" height="36" rx="1"/>
+    <rect x="7" y="0" width="4" height="36" rx="1"/>
+    <rect x="14" y="0" width="4" height="36" rx="1"/>
+    <!-- R curve overlay -->
+    <path d="M14 0 H22 Q30 0 30 10 Q30 18 22 18 H14 M22 18 L30 36" stroke="#c41e2a" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+  <!-- "RIEDEL" text -->
+  <text x="120" y="38" font-family="'Segoe UI', 'Helvetica Neue', Arial, sans-serif" font-size="26" font-weight="700" fill="#c41e2a" text-anchor="middle" letter-spacing="4">RIEDEL</text>
+</svg>

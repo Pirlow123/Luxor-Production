@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 60">
+  <!-- Megapixel Helios logo - three overlapping green pills forming M shape -->
+  <g transform="translate(60, 4)">
+    <!-- Left pill (angled left) -->
+    <rect x="8" y="0" width="14" height="32" rx="7" fill="#009a00" transform="rotate(-12, 15, 16)" opacity="0.9"/>
+    <!-- Center pill (straight) -->
+    <rect x="33" y="0" width="14" height="32" rx="7" fill="#009a00" opacity="0.95"/>
+    <!-- Right pill (angled right) -->
+    <rect x="58" y="0" width="14" height="32" rx="7" fill="#009a00" transform="rotate(12, 65, 16)" opacity="0.9"/>
+  </g>
+  <!-- "MEGAPIXEL" text below -->
+  <text x="100" y="52" font-family="'Segoe UI', 'Helvetica Neue', Arial, sans-serif" font-size="13" font-weight="600" fill="#ffffff" text-anchor="middle" letter-spacing="3">MEGAPIXEL</text>
+</svg>

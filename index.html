@@ -18,7 +18,7 @@
         <!-- Icon Dock + Category Panel Sidebar -->
         <div id="sidebar-dock" class="sidebar-dock">
             <!-- Logo -->
-            <div class="dock-logo">
+            <div class="dock-logo" onclick="HippoApp.goHome()" style="cursor:pointer;" title="Home — Dashboard">
                 <img src="assets/logos/luxor.png" alt="Luxor" class="dock-logo-img">
             </div>
 
@@ -27,17 +27,14 @@
                 <button class="dock-icon active" data-category="devices" title="Devices">
                     <i class="fas fa-server"></i>
                 </button>
-                <button class="dock-icon" data-category="control" title="Engine Control">
-                    <i class="fas fa-sliders-h"></i>
-                </button>
-                <button class="dock-icon" data-category="led" title="LED Tools">
-                    <i class="fas fa-tv"></i>
-                </button>
                 <button class="dock-icon" data-category="tools" title="Tools">
                     <i class="fas fa-wrench"></i>
                 </button>
                 <button class="dock-icon" data-category="network" title="Network">
                     <i class="fas fa-network-wired"></i>
+                </button>
+                <button class="dock-icon" data-category="led" title="LED Tools">
+                    <i class="fas fa-tv"></i>
                 </button>
                 <button class="dock-icon" data-category="production" title="Production">
                     <i class="fas fa-hard-hat"></i>
@@ -49,7 +46,7 @@
                 <button class="dock-icon" data-category="system" title="Settings">
                     <i class="fas fa-cog"></i>
                 </button>
-                <button class="dock-icon" data-category="logs" title="Event Log" onclick="HippoApp.navigate('logs')">
+                <button class="dock-icon" title="Event Log" onclick="HippoApp.navigate('logs')">
                     <i class="fas fa-terminal"></i>
                 </button>
                 <div class="dock-engine-dot">
@@ -67,45 +64,19 @@
             </div>
 
             <div class="panel-body" id="panel-body">
-                <!-- Control category — engine-specific pages -->
-                <div class="panel-category" data-cat="control">
-                    <a href="#composition" class="nav-item" data-page="composition" style="display:none;">
-                        <i class="fas fa-th"></i><span>Composition</span>
-                    </a>
-                    <a href="#timelines" class="nav-item" data-page="timelines">
-                        <i class="fas fa-stream"></i><span>Timelines</span>
-                    </a>
-                    <a href="#media" class="nav-item" data-page="media">
-                        <i class="fas fa-photo-video"></i><span>Media</span>
-                    </a>
-                    <a href="#mixes" class="nav-item" data-page="mixes">
-                        <i class="fas fa-sliders-h"></i><span>Mixes & Layers</span>
-                    </a>
-                    <a href="#presets" class="nav-item" data-page="presets">
-                        <i class="fas fa-bookmark"></i><span>Presets</span>
-                    </a>
-                    <a href="#pins" class="nav-item" data-page="pins">
-                        <i class="fas fa-microchip"></i><span>Pin Control</span>
-                    </a>
-                    <a href="#timecode" class="nav-item" data-page="timecode">
-                        <i class="fas fa-clock"></i><span>Timecode</span>
-                    </a>
-                </div>
+                <!-- Engine control sub-items are rendered dynamically under the connected server -->
 
                 <!-- Devices category (default) — combines devices + show control -->
                 <div class="panel-category active" data-cat="devices">
                     <a href="#showrun" class="nav-item" data-page="showrun">
                         <i class="fas fa-theater-masks"></i><span>Show Run</span>
                     </a>
-                    <a href="#dashboard" class="nav-item active" data-page="dashboard">
-                        <i class="fas fa-th-large"></i><span>Dashboard</span>
-                    </a>
-
+                    <div style="border-top:1px solid var(--border-light);margin:6px 8px;opacity:0.4;"></div>
                     <div class="device-group" id="server-selector">
                         <div class="device-group-header">
-                            <a href="#dashboard" class="nav-item device-nav" data-page="dashboard">
+                            <span class="device-group-label" onclick="HippoApp.navigate('dashboard')">
                                 <i class="fas fa-server"></i><span>Engines</span>
-                            </a>
+                            </span>
                             <button class="btn-inline-add" onclick="HippoApp.showAddServer()" title="Add Server"><i class="fas fa-plus"></i></button>
                         </div>
                         <div id="server-list" class="sidebar-device-list" style="display:flex;flex-direction:column;gap:3px;"></div>
@@ -120,9 +91,9 @@
 
                     <div class="device-group" id="led-processor-selector">
                         <div class="device-group-header">
-                            <a href="#ledprocessor" class="nav-item device-nav" data-page="ledprocessor">
+                            <span class="device-group-label" onclick="HippoApp.navigate('ledprocessor')">
                                 <i class="fas fa-microchip"></i><span>LED Processors</span>
-                            </a>
+                            </span>
                             <button class="btn-inline-add" onclick="HippoApp.showAddLedProcessor()" title="Add Processor"><i class="fas fa-plus"></i></button>
                         </div>
                         <div id="led-processor-list" class="sidebar-device-list" style="display:flex;flex-direction:column;gap:3px;"></div>
@@ -130,9 +101,9 @@
 
                     <div class="device-group" id="ptz-camera-selector">
                         <div class="device-group-header">
-                            <a href="#ptz" class="nav-item device-nav" data-page="ptz">
+                            <span class="device-group-label" onclick="HippoApp.navigate('ptz')">
                                 <i class="fas fa-video"></i><span>PTZ Cameras</span>
-                            </a>
+                            </span>
                             <button class="btn-inline-add" onclick="PtzPage.showAddCamera()" title="Add Camera"><i class="fas fa-plus"></i></button>
                         </div>
                         <div id="ptz-camera-list" class="sidebar-device-list" style="display:flex;flex-direction:column;gap:3px;"></div>
@@ -140,9 +111,9 @@
 
                     <div class="device-group" id="net-switch-selector">
                         <div class="device-group-header">
-                            <a href="#netswitch" class="nav-item device-nav" data-page="netswitch">
+                            <span class="device-group-label" onclick="HippoApp.navigate('netswitch')">
                                 <i class="fas fa-ethernet"></i><span>Network Switches</span>
-                            </a>
+                            </span>
                             <button class="btn-inline-add" onclick="NetSwitchPage.showAddSwitch()" title="Add Switch"><i class="fas fa-plus"></i></button>
                         </div>
                         <div id="net-switch-list" class="sidebar-device-list" style="display:flex;flex-direction:column;gap:3px;"></div>
@@ -150,9 +121,9 @@
 
                     <div class="device-group" id="lighting-console-selector">
                         <div class="device-group-header">
-                            <a href="#lighting" class="nav-item device-nav" data-page="lighting">
+                            <span class="device-group-label" onclick="HippoApp.navigate('lighting')">
                                 <i class="fas fa-lightbulb"></i><span>Lighting Consoles</span>
-                            </a>
+                            </span>
                             <button class="btn-inline-add" onclick="LightingPage.showAddConsole()" title="Add Console"><i class="fas fa-plus"></i></button>
                         </div>
                         <div id="lighting-console-list" class="sidebar-device-list" style="display:flex;flex-direction:column;gap:3px;"></div>
@@ -160,9 +131,9 @@
 
                     <div class="device-group" id="intercom-selector">
                         <div class="device-group-header">
-                            <a href="#intercom" class="nav-item device-nav" data-page="intercom">
+                            <span class="device-group-label" onclick="HippoApp.navigate('intercom')">
                                 <i class="fas fa-headset"></i><span>Intercom</span>
-                            </a>
+                            </span>
                             <button class="btn-inline-add" onclick="IntercomPage.showAddSystem()" title="Add Intercom"><i class="fas fa-plus"></i></button>
                         </div>
                         <div id="intercom-list" class="sidebar-device-list" style="display:flex;flex-direction:column;gap:3px;"></div>
@@ -206,7 +177,7 @@
                     </a>
                 </div>
 
-                <!-- Network category -->
+                <!-- Network category — Protocols & Monitoring -->
                 <div class="panel-category" data-cat="network">
                     <a href="#nethealth" class="nav-item" data-page="nethealth">
                         <i class="fas fa-heartbeat"></i><span>Network Health</span>
@@ -224,13 +195,10 @@
                         <i class="fas fa-signal"></i><span>sACN / Art-Net</span>
                     </a>
                     <a href="#network" class="nav-item" data-page="network">
-                        <i class="fas fa-network-wired"></i><span>Network Config</span>
+                        <i class="fas fa-sliders-h"></i><span>Protocol Config</span>
                     </a>
                     <a href="#dmx" class="nav-item" data-page="dmx">
                         <i class="fas fa-lightbulb"></i><span>DMX / Art-Net</span>
-                    </a>
-                    <a href="#sync" class="nav-item" data-page="sync">
-                        <i class="fas fa-sync-alt"></i><span>Sync & Cluster</span>
                     </a>
                 </div>
 
@@ -270,18 +238,36 @@
 
                 <!-- System category -->
                 <div class="panel-category" data-cat="system">
-                    <a href="#settings" class="nav-item" data-page="settings">
-                        <i class="fas fa-cog"></i><span>Settings</span>
+                    <a href="#settings" class="nav-item" data-page="settings" data-section="project">
+                        <i class="fas fa-folder-open"></i><span>Project</span>
                     </a>
-                    <a href="#logs" class="nav-item" data-page="logs">
-                        <i class="fas fa-terminal"></i><span>Event Log</span>
+                    <a href="#settings" class="nav-item" data-page="settings" data-section="servers">
+                        <i class="fas fa-server"></i><span>Servers</span>
+                    </a>
+                    <a href="#settings" class="nav-item" data-page="settings" data-section="network">
+                        <i class="fas fa-globe"></i><span>Network & NTP</span>
+                    </a>
+                    <a href="#settings" class="nav-item" data-page="settings" data-section="cluster">
+                        <i class="fas fa-project-diagram"></i><span>Cluster & Sync</span>
+                    </a>
+                    <a href="#settings" class="nav-item" data-page="settings" data-section="api">
+                        <i class="fas fa-plug"></i><span>API</span>
+                    </a>
+                    <a href="#settings" class="nav-item" data-page="settings" data-section="companion">
+                        <i class="fas fa-gamepad"></i><span>Companion</span>
+                    </a>
+                    <a href="#settings" class="nav-item" data-page="settings" data-section="display">
+                        <i class="fas fa-desktop"></i><span>Display</span>
+                    </a>
+                    <a href="#settings" class="nav-item" data-page="settings" data-section="about">
+                        <i class="fas fa-info-circle"></i><span>About</span>
                     </a>
                 </div>
             </div>
 
             <div class="panel-footer" id="sidebar-footer">
                 <span id="engine-text">No Engine</span>
-                <span class="version-info">v1.4</span>
+                <span class="version-info">v1.5</span>
             </div>
         </aside>
 
@@ -292,14 +278,16 @@
                     <button class="btn btn-icon btn-ghost mobile-menu" onclick="HippoApp.toggleSidebar()">
                         <i class="fas fa-bars"></i>
                     </button>
-                    <h1 id="page-title">Dashboard</h1>
-                    <span id="page-subtitle" class="topbar-subtitle"></span>
+                    <button class="topbar-home-btn" onclick="HippoApp.goHome()" title="Home — Dashboard">
+                        <i class="fas fa-th-large"></i><span>Dashboard</span>
+                    </button>
                 </div>
                 <div class="topbar-center"></div>
                 <div class="topbar-right">
-                    <button id="theme-toggle" class="theme-toggle" onclick="HippoApp.toggleTheme()" title="Toggle light/dark theme">
-                        <i class="fas fa-moon"></i>
-                    </button>
+                    <div class="topbar-timecode" id="topbar-timecode" style="display:none;" onclick="HippoApp.navigate('timecodegen')" title="Timecode Generator — click to open">
+                        <i class="fas fa-clock"></i>
+                        <span id="topbar-tc-value" class="mono">00:00:00:00</span>
+                    </div>
                     <div class="topbar-stat clickable" id="stat-engine" onclick="HippoApp.navigate('status')" title="Click to view System Status">
                         <i class="fas fa-circle" id="topbar-conn-dot" style="font-size:8px;color:var(--text-muted);"></i>
                         <span id="engine-status-text">--</span>
@@ -403,6 +391,8 @@
     <script src="js/pages/sacnmonitor.js"></script>
     <script src="js/pages/showclock.js"></script>
     <script src="js/pages/specifications.js"></script>
+    <script src="js/pages/engine-media.js"></script>
+    <script src="js/pages/engine-mixing.js"></script>
     <script src="js/pages/settings.js"></script>
     <script src="js/pages/logs.js"></script>
     <script src="js/app.js"></script>

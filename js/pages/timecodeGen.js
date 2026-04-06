@@ -55,6 +55,7 @@ const TimecodeGenPage = {
 
     // Settings persistence key
     _STORAGE_KEY: 'luxor_tcgen_settings',
+    _STATE_KEY: 'luxor_tcgen_state',
 
     // Frame rate definitions: [label, actualFps, nominalFps, isDropFrame]
     _FRAME_RATES: [
@@ -256,17 +257,21 @@ const TimecodeGenPage = {
         if (this._mode === 'running') return;
 
         if (this._mode === 'paused') {
-            // Resume from pause
+            // Resume from pause — adjust _absStartTime by how long we were paused
+            const pauseDuration = Date.now() - this._absPauseTime;
+            this._absStartTime += pauseDuration;
             this._startTime = performance.now() - this._pauseElapsed;
         } else {
             // Fresh start
             this._startFrameOffset = this._tcToFrames(this._startH, this._startM, this._startS, this._startF);
             this._startTime = performance.now();
+            this._absStartTime = Date.now();
             this._pauseElapsed = 0;
         }
 
         this._mode = 'running';
         this._running = true;
+        this._saveState();
         this._updateTransportButtons();
         this._generatorTick();
     },
@@ -274,11 +279,14 @@ const TimecodeGenPage = {
     _pause() {
         if (this._mode !== 'running') return;
         this._pauseElapsed = performance.now() - this._startTime;
+        this._absPauseTime = Date.now();
         this._mode = 'paused';
         this._running = false;
         if (this._rafId) { cancelAnimationFrame(this._rafId); this._rafId = null; }
         if (this._bgTimer) { clearInterval(this._bgTimer); this._bgTimer = null; }
+        this._saveState();
         this._updateTransportButtons();
+        this._updateTopbarTc();
     },
 
     _stop() {
@@ -288,8 +296,10 @@ const TimecodeGenPage = {
         if (this._rafId) { cancelAnimationFrame(this._rafId); this._rafId = null; }
         if (this._bgTimer) { clearInterval(this._bgTimer); this._bgTimer = null; }
         this._currentTotalFrames = this._tcToFrames(this._startH, this._startM, this._startS, this._startF);
+        this._saveState();
         this._updateMainDisplay();
         this._updateTransportButtons();
+        this._updateTopbarTc();
     },
 
     _reset() {
@@ -320,6 +330,9 @@ const TimecodeGenPage = {
         // Update frame counter
         const frEl = document.getElementById('tcg-frame-counter');
         if (frEl) frEl.textContent = 'Frame: ' + this._currentTotalFrames;
+
+        // Always update topbar timecode
+        this._updateTopbarTc();
     },
 
     _updateTransportButtons() {
@@ -1025,6 +1038,89 @@ const TimecodeGenPage = {
         } catch (e) { /* localStorage may be unavailable */ }
     },
 
+    // --- Bulletproof state persistence (survives page refresh) ---
+    _absStartTime: 0,     // Date.now() when started (absolute wall clock)
+    _absPauseTime: 0,     // Date.now() when paused
+
+    _saveState() {
+        try {
+            localStorage.setItem(this._STATE_KEY, JSON.stringify({
+                mode: this._mode,
+                absStartTime: this._absStartTime,
+                absPauseTime: this._absPauseTime,
+                startFrameOffset: this._startFrameOffset,
+                offsetFrames: this._offsetFrames,
+                fpsActual: this._fpsActual,
+                fpsNominal: this._fpsNominal,
+                dropFrame: this._dropFrame,
+                countdownMode: this._countdownMode,
+                countdownTarget: this._countdownTarget,
+                pauseElapsed: this._pauseElapsed,
+            }));
+        } catch {}
+    },
+
+    _restoreState() {
+        try {
+            const raw = localStorage.getItem(this._STATE_KEY);
+            if (!raw) return false;
+            const s = JSON.parse(raw);
+            if (!s || s.mode === 'stopped') return false;
+
+            // Restore frame rate
+            this._fpsActual = s.fpsActual;
+            this._fpsNominal = s.fpsNominal;
+            this._dropFrame = s.dropFrame;
+            this._startFrameOffset = s.startFrameOffset;
+            this._offsetFrames = s.offsetFrames || 0;
+            this._countdownMode = s.countdownMode || false;
+            this._countdownTarget = s.countdownTarget || 0;
+            this._absStartTime = s.absStartTime;
+            this._absPauseTime = s.absPauseTime || 0;
+
+            if (s.mode === 'running') {
+                // Reconstruct performance.now()-based timing from absolute wall clock
+                const wallElapsed = Date.now() - this._absStartTime;
+                this._startTime = performance.now() - wallElapsed;
+                this._pauseElapsed = 0;
+                this._mode = 'running';
+                this._running = true;
+                // Start background timer immediately (RAF starts when page activates)
+                this._bgTimer = setInterval(() => {
+                    const elapsed = performance.now() - this._startTime;
+                    let totalFrames = Math.floor(elapsed / 1000 * this._fpsActual) + this._startFrameOffset + this._offsetFrames;
+                    this._currentTotalFrames = this._wrapFrames(totalFrames, this._fpsNominal, this._dropFrame);
+                    this._updateTopbarTc();
+                }, 100);
+                return true;
+            } else if (s.mode === 'paused') {
+                this._pauseElapsed = s.pauseElapsed || 0;
+                this._startTime = performance.now() - this._pauseElapsed;
+                const elapsed = this._pauseElapsed;
+                let totalFrames = Math.floor(elapsed / 1000 * this._fpsActual) + this._startFrameOffset + this._offsetFrames;
+                this._currentTotalFrames = this._wrapFrames(totalFrames, this._fpsNominal, this._dropFrame);
+                this._mode = 'paused';
+                this._running = false;
+                this._updateTopbarTc();
+                return true;
+            }
+        } catch {}
+        return false;
+    },
+
+    _updateTopbarTc() {
+        const container = document.getElementById('topbar-timecode');
+        const valueEl = document.getElementById('topbar-tc-value');
+        if (!container) return;
+        if (this._mode === 'stopped') {
+            container.style.display = 'none';
+        } else {
+            container.style.display = 'flex';
+            container.classList.toggle('paused', this._mode === 'paused');
+            if (valueEl) valueEl.textContent = this._formatCurrentTc();
+        }
+    },
+
     _loadSettings() {
         try {
             const raw = localStorage.getItem(this._STORAGE_KEY);
@@ -1090,7 +1186,10 @@ const TimecodeGenPage = {
         // Only load settings on first activation (not when returning to page with running generator)
         if (this._mode === 'stopped' && !this._running) {
             this._loadSettings();
-            this._currentTotalFrames = this._tcToFrames(this._startH, this._startM, this._startS, this._startF);
+            // Try to restore a running/paused state from a previous session (page refresh)
+            if (!this._restoreState()) {
+                this._currentTotalFrames = this._tcToFrames(this._startH, this._startM, this._startS, this._startF);
+            }
         }
 
         setTimeout(() => {

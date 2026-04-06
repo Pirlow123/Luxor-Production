@@ -349,6 +349,25 @@ class BarcoAPI {
     }
 
     // ================================================================
+    // COMPOSITE STATE
+    // ================================================================
+    async getState() {
+        const [destinations, sources, presets, auxDests] = await Promise.all([
+            this.listDestinations().catch(() => []),
+            this.listSources().catch(() => []),
+            this.listPresets().catch(() => []),
+            this.listAuxDestinations().catch(() => []),
+        ]);
+        let superScreens = [];
+        try { superScreens = await this.getSuperScreens(); } catch {}
+        let firmware = '';
+        try { firmware = await this.getFirmwareVersion(); } catch {}
+        let powerOk = true;
+        try { const ps = await this.powerStatus(); powerOk = ps?.status !== 'error'; } catch { powerOk = false; }
+        return { destinations, sources, presets, auxDestinations: auxDests, superScreens, firmware, powerOk };
+    }
+
+    // ================================================================
     // HEALTH CHECK
     // ================================================================
     async healthCheck() {

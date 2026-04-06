@@ -15,10 +15,10 @@ const LedProcessorPage = {
     // All supported Novastar processor models grouped by line
     _models: {
         'COEX': [
-            { id: 'CX40 Pro', name: 'CX40 Pro', api: 'http', port: 8001, desc: '4-port Ethernet, 4K@60Hz', icon: 'fa-microchip', hasScaler: true, hasHDR: true, hasGenlock: true, hasMediaPlayer: false, role: 'processor' },
-            { id: 'CX80 Pro', name: 'CX80 Pro', api: 'http', port: 8001, desc: '8-port Ethernet, 8K processing', icon: 'fa-microchip', hasScaler: true, hasHDR: true, hasGenlock: true, hasMediaPlayer: false, role: 'processor' },
-            { id: 'MX40 Pro', name: 'MX40 Pro', api: 'http', port: 8001, desc: '4-port, HDR10, 7680×4320', icon: 'fa-microchip', hasScaler: true, hasHDR: true, hasGenlock: true, hasMediaPlayer: false, role: 'processor' },
-            { id: 'MX40 Pro S', name: 'MX40 Pro S', api: 'http', port: 8001, desc: '4-port, compact touring', icon: 'fa-microchip', hasScaler: true, hasHDR: true, hasGenlock: true, hasMediaPlayer: false, role: 'processor' },
+            { id: 'CX40 Pro', name: 'CX40 Pro', api: 'http', port: 80, altPorts: [80, 8001, 8080], desc: '4-port Ethernet, 4K@60Hz, Cloud OS', icon: 'fa-microchip', hasScaler: true, hasHDR: true, hasGenlock: true, hasMediaPlayer: false, role: 'processor', firmware: 'cloudos' },
+            { id: 'CX80 Pro', name: 'CX80 Pro', api: 'http', port: 80, altPorts: [80, 8001, 8080], desc: '8-port Ethernet, 8K processing, Cloud OS', icon: 'fa-microchip', hasScaler: true, hasHDR: true, hasGenlock: true, hasMediaPlayer: false, role: 'processor', firmware: 'cloudos' },
+            { id: 'MX40 Pro', name: 'MX40 Pro', api: 'http', port: 80, altPorts: [80, 8001, 8080], desc: '20x Ethernet + 4x Fiber, HDR10, Cloud OS', icon: 'fa-microchip', hasScaler: true, hasHDR: true, hasGenlock: true, hasMediaPlayer: false, role: 'processor', firmware: 'cloudos' },
+            { id: 'MX40 Pro S', name: 'MX40 Pro S', api: 'http', port: 80, altPorts: [80, 8001, 8080], desc: '20x Ethernet + 4x Fiber, compact touring, Cloud OS', icon: 'fa-microchip', hasScaler: true, hasHDR: true, hasGenlock: true, hasMediaPlayer: false, role: 'processor', firmware: 'cloudos' },
         ],
         'VX Series': [
             { id: 'VX1000', name: 'VX1000', api: 'http', port: 8001, desc: '10x Ethernet, 10.4M pixels', icon: 'fa-server', hasScaler: true, hasHDR: true, hasGenlock: true, hasMediaPlayer: false, role: 'processor' },
@@ -58,24 +58,67 @@ const LedProcessorPage = {
 
     render() {
         return `
-        <div class="led-page">
-            <div class="led-toolbar">
-                <div class="led-toolbar-left">
-                    <select class="sr-select" id="led-proc-select" onchange="LedProcessorPage.selectProcessor(this.value)">
-                        <option value="">-- Select Processor --</option>
-                        ${this._processors.map(p => `<option value="${p.id}" ${this._activeProc?.id === p.id ? 'selected' : ''}>${p.virtual ? '\u{1F9EA} ' : ''}${UI.esc(p.name)} (${p.type})</option>`).join('')}
-                    </select>
-                    <button class="btn btn-xs btn-primary" onclick="LedProcessorPage.showAddProcessor()"><i class="fas fa-plus"></i> Add</button>
-                    ${this._activeProc ? `<button class="btn btn-xs" onclick="LedProcessorPage._reconnect()" title="Reconnect"><i class="fas fa-sync-alt"></i> Reconnect</button>` : ''}
-                    ${this._activeProc ? `<button class="btn btn-xs btn-danger" onclick="LedProcessorPage.confirmRemoveProcessor()"><i class="fas fa-trash"></i> Remove</button>` : ''}
-                </div>
-                <div class="led-toolbar-right">
-                    ${this._activeProc ? `<span class="led-status ${this._status.online ? 'led-status-on' : 'led-status-off'}">${this._status.online ? 'ONLINE' : 'OFFLINE'}</span>` : ''}
+        <div class="section-header">
+            <h2><i class="fas fa-microchip"></i> LED Processors</h2>
+            <div class="flex gap-sm">
+                ${this._activeProc ? `<button class="btn btn-sm" onclick="LedProcessorPage._reconnect()" title="Reconnect"><i class="fas fa-sync-alt"></i> Reconnect</button>` : ''}
+                <button class="btn btn-sm btn-primary" onclick="LedProcessorPage.showAddProcessor()"><i class="fas fa-plus"></i> Add Processor</button>
+            </div>
+        </div>
+        <div class="ptz-layout">
+            <div class="ptz-camera-list">
+                <div class="card" style="height:100%">
+                    <div class="card-header"><h3><i class="fas fa-list"></i> Processors</h3></div>
+                    <div class="card-body" style="padding:0" id="led-proc-list-inner">
+                        ${this._renderProcessorList()}
+                    </div>
                 </div>
             </div>
-
-            ${!this._activeProc ? this._renderEmpty() : this._renderControls()}
+            <div class="ptz-controls-area" id="led-controls">
+                ${!this._activeProc ? this._renderEmpty() : this._renderControls()}
+            </div>
         </div>`;
+    },
+
+    _renderProcessorList() {
+        if (this._processors.length === 0) {
+            return '<div class="text-muted" style="text-align:center;padding:20px;font-size:12px">No processors added.<br>Click + Add Processor to get started.</div>';
+        }
+        return this._processors.map(p => {
+            const sel = this._activeProc?.id === p.id ? 'selected' : '';
+            const online = p.online || p.virtual;
+            const dot = online ? 'var(--green)' : 'var(--red)';
+            const brand = this._getBrand(p);
+            const brandLabel = brand === 'megapixel' ? 'Megapixel' : brand === 'brompton' ? 'Brompton' : 'Novastar';
+            const brandLogo = brand === 'megapixel' ? 'assets/logos/megapixel.svg' : brand === 'novastar' ? 'assets/logos/novastar.svg' : null;
+            const ip = p.virtual ? 'Virtual' : (p.host || '--');
+            return `
+                <div class="ptz-cam-card ${sel}" onclick="LedProcessorPage.selectProcessor('${p.id}')">
+                    <div class="flex" style="align-items:center;gap:8px">
+                        ${brandLogo
+                            ? `<img src="${brandLogo}" style="width:20px;height:20px;object-fit:contain;flex-shrink:0;border-radius:3px;" alt="${brandLabel}">`
+                            : `<div style="width:8px;height:8px;border-radius:50%;background:${dot};flex-shrink:0"></div>`
+                        }
+                        <div style="flex:1;min-width:0">
+                            <div style="font-weight:600;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${UI.esc(p.name)}</div>
+                            <div style="font-size:10px;color:var(--text-muted)">${brandLabel} ${UI.esc(p.type)} &bull; ${UI.esc(ip)}</div>
+                        </div>
+                        <div style="width:8px;height:8px;border-radius:50%;background:${dot};flex-shrink:0"></div>
+                        <button class="btn-icon" onclick="event.stopPropagation();LedProcessorPage.confirmRemove('${p.id}')" title="Remove"><i class="fas fa-times" style="font-size:10px"></i></button>
+                    </div>
+                </div>`;
+        }).join('');
+    },
+
+    _refreshAll() {
+        const listEl = document.getElementById('led-proc-list-inner');
+        if (listEl) listEl.innerHTML = this._renderProcessorList();
+        const ctrlEl = document.getElementById('led-controls');
+        if (ctrlEl) ctrlEl.innerHTML = this._activeProc ? this._renderControls() : this._renderEmpty();
+        // Update external sidebar
+        if (typeof HippoApp !== 'undefined' && HippoApp.renderLedProcessorList) {
+            HippoApp.renderLedProcessorList();
+        }
     },
 
     _renderEmpty() {
@@ -679,13 +722,13 @@ const LedProcessorPage = {
         // Update slider
         const slider = document.querySelector('.led-brightness-slider');
         if (slider && slider !== document.activeElement) slider.value = v;
-        await this._apiCall('PUT', '/screen/brightness', { brightness: v });
+        await this._apiAction('PUT', 'setBright', { brightness: v, value: v, level: v });
         appState.log('EVENT', `LED brightness → ${v}%`, 'LED');
     },
 
     async setDisplayMode(mode) {
         this._status.displayMode = mode;
-        await this._apiCall('PUT', '/device/screen/displaymode', { mode: mode.toLowerCase() });
+        await this._apiAction('PUT', 'setMode', { mode: mode.toLowerCase(), displayMode: mode });
         UI.toast(`Display mode: ${mode}`, mode === 'Blackout' ? 'warning' : 'info');
         appState.log('EVENT', `LED display mode → ${mode}`, 'LED');
         this.refresh();
@@ -693,7 +736,7 @@ const LedProcessorPage = {
 
     async setInput(input) {
         this._status.activeInput = input;
-        await this._apiCall('PUT', '/device/input/source', { source: input });
+        await this._apiAction('PUT', 'setInput', { source: input, input, activeInput: input });
         UI.toast(`Input: ${input}`, 'success');
         appState.log('EVENT', `LED input → ${input}`, 'LED');
         this.refresh();
@@ -701,20 +744,20 @@ const LedProcessorPage = {
 
     async setTestPattern(pattern) {
         this._status.testPattern = pattern === 'Off' ? null : pattern;
-        await this._apiCall('PUT', '/device/screen/controller/pattern/test', { mode: pattern.toLowerCase(), state: pattern !== 'Off' });
+        await this._apiAction('PUT', 'setPattern', { mode: pattern.toLowerCase(), pattern, state: pattern !== 'Off', enabled: pattern !== 'Off' });
         UI.toast(pattern === 'Off' ? 'Test pattern off' : `Test pattern: ${pattern}`, 'info');
         this.refresh();
     },
 
     async setGamma(val) {
         this._status.gamma = parseFloat(val);
-        await this._apiCall('PUT', '/screen/gamma', { gamma: val });
+        await this._apiAction('PUT', 'setGamma', { gamma: parseFloat(val), value: parseFloat(val) });
         this.refresh();
     },
 
     async loadPreset(name) {
         this._status.activePreset = name;
-        await this._apiCall('POST', '/preset/current/update', { name });
+        await this._apiAction('POST', 'setPreset', { name, preset: name });
         UI.toast(`Preset: ${name}`, 'success');
         appState.log('EVENT', `LED preset → ${name}`, 'LED');
         this.refresh();
@@ -764,30 +807,88 @@ const LedProcessorPage = {
     async _novaAction(action, value) {
         const s = this._status;
         switch (action) {
-            case 'setScaling': s.scaling = value; await this._apiCall('PUT', '/output/scaling', { mode: value }); break;
-            case 'toggleCabinetCal': s.cabinetCal = !s.cabinetCal; await this._apiCall('PUT', '/calibration/cabinet', { enabled: s.cabinetCal }); break;
+            case 'setScaling': s.scaling = value; await this._apiAction('PUT', 'setScaling', { mode: value, scaling: value }); break;
+            case 'toggleCabinetCal': s.cabinetCal = !s.cabinetCal; await this._apiAction('PUT', 'setCal', { enabled: s.cabinetCal, type: 'cabinet' }); break;
         }
         appState.log('EVENT', `Novastar ${action}${value ? ': ' + value : ''}`, 'LED');
         this.refresh();
     },
 
     // ================================================================
-    // API CALL — HTTP to processor
+    // API CALL — HTTP to processor (action-key based)
     // ================================================================
-    async _apiCall(method, path, body) {
-        if (!this._activeProc) return;
-        if (this._activeProc.virtual) return; // Virtual — no real call
-        const url = `http://${this._activeProc.host}:${this._activeProc.port}/api/v1${path}`;
+    // Resolve the correct absolute URL for an action using the cached working endpoint pattern
+    _resolveActionUrl(actionKey) {
+        if (!this._activeProc) return null;
+        const cached = this._workingEndpoints[this._activeProc.id];
+        if (cached && cached[actionKey]) return cached[actionKey];
+        // Fallback: use brand defaults
+        const brand = this._getBrand(this._activeProc);
+        if (brand === 'brompton' && this._bromptonEndpoints[actionKey]) return this._bromptonEndpoints[actionKey];
+        if (brand === 'megapixel' && this._megapixelEndpoints[actionKey]) return this._megapixelEndpoints[actionKey];
+        // Novastar fallback — try first COEX pattern
+        if (this._novastarEndpoints[0][actionKey]) return this._novastarEndpoints[0][actionKey];
+        return null;
+    },
+
+    // Send an action using the resolved endpoint for the active processor's discovered API pattern
+    async _apiAction(method, actionKey, body) {
+        if (!this._activeProc) return null;
+        if (this._activeProc.virtual) return null;
+        const url = this._resolveActionUrl(actionKey);
+        if (!url) { console.warn('[LED] No endpoint for action:', actionKey); return null; }
+        return this._apiRaw(method, url, body);
+    },
+
+    // Raw API call with an absolute path — tries the given path, then fallbacks
+    async _apiRaw(method, absolutePath, body) {
+        if (!this._activeProc) return null;
+        if (this._activeProc.virtual) return null;
+        const host = `http://${this._activeProc.host}:${this._activeProc.port}`;
+        const url = `${host}${absolutePath}`;
         try {
-            await fetch(url, {
+            const resp = await fetch(url, {
                 method,
                 headers: { 'Content-Type': 'application/json' },
                 body: body ? JSON.stringify(body) : undefined,
+                signal: AbortSignal.timeout(5000),
             });
-        } catch (e) {
-            // Silently fail — processor might be unreachable
-            console.warn('[LED] API call failed:', e.message);
+            if (resp.ok) {
+                try { return await resp.json(); } catch { return null; }
+            }
+        } catch {}
+        console.warn('[LED] API call failed:', absolutePath);
+        return null;
+    },
+
+    // Legacy _apiCall for Helios/Brompton specific actions that pass relative paths
+    async _apiCall(method, path, body) {
+        if (!this._activeProc) return null;
+        if (this._activeProc.virtual) return null;
+        const host = `http://${this._activeProc.host}:${this._activeProc.port}`;
+        const cached = this._workingEndpoints[this._activeProc.id];
+        const prefix = cached?.prefix ?? '/api/v1';
+
+        // Try the cached prefix first, then fallback to common prefixes
+        const prefixes = [prefix, '/api/v1/device', '/api/v1', '/api/device', '/api', ''];
+        const uniquePrefixes = [...new Set(prefixes)];
+
+        for (const pfx of uniquePrefixes) {
+            const url = `${host}${pfx}${path}`;
+            try {
+                const resp = await fetch(url, {
+                    method,
+                    headers: { 'Content-Type': 'application/json' },
+                    body: body ? JSON.stringify(body) : undefined,
+                    signal: AbortSignal.timeout(5000),
+                });
+                if (resp.ok) {
+                    try { return await resp.json(); } catch { return null; }
+                }
+            } catch {}
         }
+        console.warn('[LED] API call failed for all prefixes:', path);
+        return null;
     },
 
     // ================================================================
@@ -797,11 +898,11 @@ const LedProcessorPage = {
     _selectedBrand: null,
     _selectedModel: null,
 
-    // Brand definitions with colors and icons
+    // Brand definitions with colors, icons, and logos
     _brands: {
-        'Novastar': { color: '#f59e0b', icon: 'fa-microchip', lines: ['COEX', 'VX Series', 'NovaPro', 'MCTRL', 'J Series'] },
-        'Megapixel': { color: '#00d4ff', icon: 'fa-sun', lines: ['Megapixel'] },
-        'Brompton': { color: '#e040fb', icon: 'fa-gem', lines: ['Brompton'] },
+        'Novastar': { color: '#f59e0b', icon: 'fa-microchip', logo: 'assets/logos/novastar.svg', lines: ['COEX', 'VX Series', 'NovaPro', 'MCTRL', 'J Series'] },
+        'Megapixel Helios': { color: '#00d4ff', icon: 'fa-sun', logo: 'assets/logos/megapixel.svg', lines: ['Megapixel'] },
+        'Brompton': { color: '#e040fb', icon: 'fa-gem', logo: null, lines: ['Brompton'] },
     },
 
     showAddProcessor() {
@@ -840,9 +941,14 @@ const LedProcessorPage = {
                             text-align:center;transition:all 0.15s;color:var(--text-primary);
                         " onmouseover="this.style.borderColor='${info.color}';this.style.background='${info.color}12'"
                            onmouseout="this.style.borderColor='var(--border)';this.style.background='var(--bg-secondary)'">
-                            <div style="width:52px;height:52px;border-radius:12px;background:${info.color}18;display:flex;align-items:center;justify-content:center;">
-                                <i class="fas ${info.icon}" style="color:${info.color};font-size:22px;"></i>
-                            </div>
+                            ${info.logo
+                                ? `<div style="width:52px;height:52px;border-radius:12px;background:${info.color}18;display:flex;align-items:center;justify-content:center;overflow:hidden;">
+                                    <img src="${info.logo}" style="width:40px;height:40px;object-fit:contain;" alt="${brand}">
+                                  </div>`
+                                : `<div style="width:52px;height:52px;border-radius:12px;background:${info.color}18;display:flex;align-items:center;justify-content:center;">
+                                    <i class="fas ${info.icon}" style="color:${info.color};font-size:22px;"></i>
+                                  </div>`
+                            }
                             <div>
                                 <div style="font-size:14px;font-weight:800;">${brand}</div>
                                 <div style="font-size:10px;color:var(--text-muted);margin-top:2px;">
@@ -1022,17 +1128,28 @@ const LedProcessorPage = {
         this.refresh();
     },
 
-    confirmRemoveProcessor() {
-        if (!this._activeProc) return;
-        const name = this._activeProc.name;
+    confirmRemove(id) {
+        const proc = id ? this._processors.find(p => p.id === id) : this._activeProc;
+        if (!proc) return;
+        const name = proc.name;
+        const brand = this._getBrand(proc);
+        const brandLabel = brand === 'megapixel' ? 'Megapixel' : brand === 'brompton' ? 'Brompton' : 'Novastar';
+        const ip = proc.virtual ? 'Virtual Demo' : `${proc.host}:${proc.port}`;
         UI.openModal('Remove Processor', `
-            <p style="text-align:center;padding:12px 0;">
-                <i class="fas fa-exclamation-triangle" style="color:#f59e0b;font-size:24px;"></i>
-            </p>
-            <p style="text-align:center;font-size:13px;">Remove <strong>${UI.esc(name)}</strong>?</p>
-            <p style="text-align:center;font-size:11px;color:var(--text-muted);">This cannot be undone.</p>
+            <div style="text-align:center;padding:16px 0 8px;">
+                <div style="width:56px;height:56px;border-radius:50%;background:rgba(239,68,68,0.12);display:inline-flex;align-items:center;justify-content:center;margin-bottom:12px;">
+                    <i class="fas fa-trash-alt" style="color:#f87171;font-size:22px;"></i>
+                </div>
+                <p style="font-size:14px;font-weight:700;margin:0 0 4px;">Remove <strong>${UI.esc(name)}</strong>?</p>
+                <p style="font-size:11px;color:var(--text-muted);margin:0 0 8px;">${brandLabel} ${UI.esc(proc.type)} &bull; ${UI.esc(ip)}</p>
+                <p style="font-size:11px;color:var(--text-muted);margin:0;">This action cannot be undone. The processor will be removed from your list.</p>
+            </div>
         `, `<button class="btn" onclick="UI.closeModal()">Cancel</button>
-            <button class="btn btn-danger" onclick="LedProcessorPage.removeProcessor('${this._activeProc.id}');UI.closeModal();UI.toast('Processor removed','info');">Remove</button>`);
+            <button class="btn btn-danger" onclick="LedProcessorPage.removeProcessor('${proc.id}');UI.closeModal();UI.toast('Processor removed','info');"><i class="fas fa-trash-alt"></i> Remove</button>`);
+    },
+
+    confirmRemoveProcessor() {
+        this.confirmRemove(this._activeProc?.id);
     },
 
     _virtualStatus(type) {
@@ -1135,11 +1252,17 @@ const LedProcessorPage = {
         this._activeProc = proc || null;
         if (proc?.virtual) {
             this._status = this._virtualStatus(proc.type);
+            // Persist virtual status fields for dashboard
+            proc._resolution = this._status.outputWidth && this._status.outputHeight ? `${this._status.outputWidth}x${this._status.outputHeight}` : null;
+            proc._activeInput = this._status.activeInput || null;
+            proc._firmware = this._status.firmware || null;
+            proc._temperature = this._status.temperature || null;
+            this._saveProcessors();
         } else {
             this._status = { online: false };
             if (proc) await this._fetchStatus();
         }
-        this.refresh();
+        this._refreshAll();
     },
 
     removeProcessor(id) {
@@ -1149,47 +1272,176 @@ const LedProcessorPage = {
             this._activeProc = null;
             this._status = {};
         }
-        this.refresh();
+        this._refreshAll();
+    },
+
+    // API endpoint patterns to try for Novastar processors (different firmware versions use different paths)
+    // Each pattern defines FULL absolute paths for read AND write operations
+    _novastarEndpoints: [
+        // COEX / Cloud OS (MX40 Pro, CX40 Pro, CX80 Pro)
+        { hw: '/api/v1/device/info', bright: '/api/v1/device/brightness', input: '/api/v1/device/input', temp: '/api/v1/device/temperature', prefix: '/api/v1/device',
+          setBright: '/api/v1/device/brightness', setInput: '/api/v1/device/input', setMode: '/api/v1/device/display-mode', setPattern: '/api/v1/device/test-pattern',
+          setGamma: '/api/v1/device/gamma', setPreset: '/api/v1/device/preset', setScaling: '/api/v1/device/scaling', setCal: '/api/v1/device/calibration' },
+        { hw: '/api/v1/device/hw', bright: '/api/v1/device/brightness', input: '/api/v1/device/input/source', temp: '/api/v1/device/temperature', prefix: '/api/v1/device',
+          setBright: '/api/v1/device/brightness', setInput: '/api/v1/device/input/source', setMode: '/api/v1/device/screen/displaymode', setPattern: '/api/v1/device/screen/test-pattern',
+          setGamma: '/api/v1/device/screen/gamma', setPreset: '/api/v1/device/preset/apply', setScaling: '/api/v1/device/output/scaling', setCal: '/api/v1/device/calibration' },
+        // VX / NovaPro firmware
+        { hw: '/api/v1/system/info', bright: '/api/v1/screen/brightness', input: '/api/v1/system/input', temp: '/api/v1/system/temperature', prefix: '/api/v1',
+          setBright: '/api/v1/screen/brightness', setInput: '/api/v1/system/input', setMode: '/api/v1/screen/displaymode', setPattern: '/api/v1/screen/test-pattern',
+          setGamma: '/api/v1/screen/gamma', setPreset: '/api/v1/preset/current/update', setScaling: '/api/v1/output/scaling', setCal: '/api/v1/calibration/cabinet' },
+        // Older firmware / generic
+        { hw: '/api/device/info', bright: '/api/device/brightness', input: '/api/device/input', temp: '/api/device/temperature', prefix: '/api/device',
+          setBright: '/api/device/brightness', setInput: '/api/device/input', setMode: '/api/device/displaymode', setPattern: '/api/device/test-pattern',
+          setGamma: '/api/device/gamma', setPreset: '/api/device/preset', setScaling: '/api/device/scaling', setCal: '/api/device/calibration' },
+        { hw: '/api/v1/system', bright: '/api/v1/brightness', input: '/api/v1/input', temp: '/api/v1/system/temperature', prefix: '/api/v1',
+          setBright: '/api/v1/brightness', setInput: '/api/v1/input', setMode: '/api/v1/displaymode', setPattern: '/api/v1/test-pattern',
+          setGamma: '/api/v1/gamma', setPreset: '/api/v1/preset', setScaling: '/api/v1/scaling', setCal: '/api/v1/calibration' },
+        // Legacy paths
+        { hw: '/current/info', bright: '/current/brightness', input: '/current/input', temp: '/current/status', prefix: '',
+          setBright: '/current/brightness', setInput: '/current/input', setMode: '/current/displaymode', setPattern: '/current/test-pattern',
+          setGamma: '/current/gamma', setPreset: '/current/preset', setScaling: '/current/scaling', setCal: '/current/calibration' },
+    ],
+    _bromptonEndpoints: { hw: '/api/system/info', bright: '/api/processor/brightness', input: '/api/processor/input', temp: '/api/system/temperature', prefix: '/api',
+        setBright: '/api/processor/brightness', setInput: '/api/processor/input', setMode: '/api/processor/displaymode', setPattern: '/api/processor/test-pattern',
+        setGamma: '/api/processor/gamma', setPreset: '/api/processor/preset', setScaling: '/api/processor/scaling', setCal: '/api/processor/calibration' },
+    _megapixelEndpoints: { hw: '/api/v1/system', bright: '/api/v1/brightness', input: '/api/v1/input', temp: '/api/v1/system/temperature', prefix: '/api/v1',
+        setBright: '/api/v1/brightness', setInput: '/api/v1/input', setMode: '/api/v1/displaymode', setPattern: '/api/v1/test-pattern',
+        setGamma: '/api/v1/gamma', setPreset: '/api/v1/preset', setScaling: '/api/v1/scaling', setCal: '/api/v1/calibration' },
+
+    // Cached working endpoint pattern per processor
+    _workingEndpoints: {},
+
+    async _tryFetch(url, timeout = 4000) {
+        try {
+            const resp = await fetch(url, { signal: AbortSignal.timeout(timeout) });
+            if (resp.ok) return resp;
+            // Accept 401/403 as "device is there but needs auth" — still count as connected
+            if (resp.status === 401 || resp.status === 403) return resp;
+        } catch {}
+        return null;
     },
 
     async _fetchStatus() {
         if (!this._activeProc || this._activeProc.virtual) return;
-        const base = `http://${this._activeProc.host}:${this._activeProc.port}/api/v1`;
+        const brand = this._getBrand(this._activeProc);
+        const procId = this._activeProc.id;
         const wasOnline = this._status.online;
-        try {
-            // Fetch hardware info + brightness + input source in parallel
-            const [hwResp, brightResp, inputResp, tempResp] = await Promise.allSettled([
-                fetch(`${base}/device/hw`, { signal: AbortSignal.timeout(3000) }),
-                fetch(`${base}/device/brightness`, { signal: AbortSignal.timeout(3000) }),
-                fetch(`${base}/device/input/source`, { signal: AbortSignal.timeout(3000) }),
-                fetch(`${base}/device/temperature`, { signal: AbortSignal.timeout(3000) }),
-            ]);
+        const modelInfo = this._getModelInfo(this._activeProc.type);
 
+        // Build list of host:port combos to try (for COEX, try alternate ports)
+        const hosts = [`http://${this._activeProc.host}:${this._activeProc.port}`];
+        if (modelInfo?.altPorts) {
+            for (const p of modelInfo.altPorts) {
+                const h = `http://${this._activeProc.host}:${p}`;
+                if (!hosts.includes(h)) hosts.push(h);
+            }
+        }
+
+        try {
             let online = false;
             const status = { ...this._status };
 
-            if (hwResp.status === 'fulfilled' && hwResp.value.ok) {
-                const data = await hwResp.value.json();
-                Object.assign(status, { online: true, firmware: data.firmware || status.firmware || '--', model: data.model || status.model, serial: data.serial || status.serial });
-                online = true;
+            // Determine endpoints to try based on brand
+            let endpointsList;
+            if (brand === 'brompton') {
+                endpointsList = [this._bromptonEndpoints];
+            } else if (brand === 'megapixel') {
+                endpointsList = [this._megapixelEndpoints];
+            } else {
+                // For Novastar, use cached working pattern first, then try all
+                const cached = this._workingEndpoints[procId];
+                if (cached) {
+                    endpointsList = [cached, ...this._novastarEndpoints.filter(e => e !== cached)];
+                } else {
+                    // For COEX models, prioritize COEX endpoints (first 2 patterns)
+                    if (modelInfo?.firmware === 'cloudos') {
+                        endpointsList = this._novastarEndpoints;
+                    } else {
+                        // For VX/NovaPro, start from pattern index 2 (VX/NovaPro pattern)
+                        endpointsList = [...this._novastarEndpoints.slice(2), ...this._novastarEndpoints.slice(0, 2)];
+                    }
+                }
             }
-            if (brightResp.status === 'fulfilled' && brightResp.value.ok) {
-                try { const d = await brightResp.value.json(); status.brightness = d.brightness ?? d.value ?? status.brightness; } catch {}
-                online = true;
+
+            // Try each host:port + endpoint pattern combo until one responds
+            for (const host of hosts) {
+                for (const endpoints of endpointsList) {
+                    // Try hardware info endpoint first as connectivity test
+                    const hwResp = await this._tryFetch(`${host}${endpoints.hw}`);
+                    if (!hwResp) continue;
+
+                    // This endpoint pattern works — cache it and update port if needed
+                    this._workingEndpoints[procId] = endpoints;
+                    online = true;
+
+                    // If we connected on an alternate port, update the stored port
+                    const connectedPort = parseInt(new URL(host).port);
+                    if (connectedPort !== this._activeProc.port) {
+                        this._activeProc.port = connectedPort;
+                        console.log(`[LED] Auto-detected working port: ${connectedPort} for ${this._activeProc.name}`);
+                    }
+
+                    try {
+                        const data = await hwResp.json();
+                        Object.assign(status, {
+                            online: true,
+                            firmware: data.firmware || data.version || data.softwareVersion || data.sw_version || status.firmware || '--',
+                            model: data.model || data.productName || data.deviceModel || data.product_name || status.model,
+                            serial: data.serial || data.serialNumber || data.sn || data.serial_number || status.serial,
+                            outputs: data.outputs || data.portCount || data.output_count || status.outputs,
+                            displayMode: data.displayMode || data.display_mode || data.mode || status.displayMode,
+                        });
+                    } catch { status.online = true; }
+
+                    // Fetch brightness, input, temp in parallel with the working base
+                    const [brightResp, inputResp, tempResp] = await Promise.allSettled([
+                        this._tryFetch(`${host}${endpoints.bright}`),
+                        this._tryFetch(`${host}${endpoints.input}`),
+                        this._tryFetch(`${host}${endpoints.temp}`),
+                    ]);
+
+                    if (brightResp.status === 'fulfilled' && brightResp.value) {
+                        try { const d = await brightResp.value.json(); status.brightness = d.brightness ?? d.value ?? d.level ?? d.screen_brightness ?? status.brightness; } catch {}
+                    }
+                    if (inputResp.status === 'fulfilled' && inputResp.value) {
+                        try { const d = await inputResp.value.json(); status.activeInput = d.source ?? d.input ?? d.activeInput ?? d.active_input ?? d.input_source ?? status.activeInput; } catch {}
+                    }
+                    if (tempResp.status === 'fulfilled' && tempResp.value) {
+                        try { const d = await tempResp.value.json(); status.temperature = d.temperature ?? d.temp ?? d.cpuTemp ?? d.cpu_temp ?? d.board_temp ?? status.temperature; } catch {}
+                    }
+
+                    break; // Found a working pattern, stop trying
+                }
+                if (online) break; // Found on this host, stop trying other ports
             }
-            if (inputResp.status === 'fulfilled' && inputResp.value.ok) {
-                try { const d = await inputResp.value.json(); status.input = d.source ?? d.input ?? status.input; } catch {}
-                online = true;
-            }
-            if (tempResp.status === 'fulfilled' && tempResp.value.ok) {
-                try { const d = await tempResp.value.json(); status.temperature = d.temperature ?? d.temp ?? status.temperature; } catch {}
+
+            // If no endpoint pattern worked, try a basic TCP-level reachability check
+            if (!online) {
+                for (const host of hosts) {
+                    const pingResp = await this._tryFetch(`${host}/`, 3000);
+                    if (pingResp) {
+                        online = true;
+                        status.online = true;
+                        // Update port if different
+                        const connectedPort = parseInt(new URL(host).port);
+                        if (connectedPort !== this._activeProc.port) this._activeProc.port = connectedPort;
+                        // Clear cached bad endpoints
+                        delete this._workingEndpoints[procId];
+                        break;
+                    }
+                }
             }
 
             status.online = online;
             this._status = status;
-
-            // Update the active processor's online flag
-            if (this._activeProc) this._activeProc.online = online;
+            if (this._activeProc) {
+                this._activeProc.online = online;
+                // Persist key status fields for dashboard display
+                this._activeProc._resolution = status.outputWidth && status.outputHeight ? `${status.outputWidth}x${status.outputHeight}` : null;
+                this._activeProc._activeInput = status.activeInput || null;
+                this._activeProc._firmware = status.firmware || null;
+                this._activeProc._temperature = status.temperature || null;
+            }
 
         } catch {
             this._status = { ...this._status, online: false };
@@ -1197,16 +1449,16 @@ const LedProcessorPage = {
         }
 
         // Refresh UI if status changed and page is active
-        if (wasOnline !== this._status.online) {
-            if (this._isActive) this.refresh();
-            this._saveProcessors();
-        }
-        // Always update sidebar dots so status stays current
-        if (typeof HippoApp !== 'undefined' && HippoApp.renderLedProcessorList) {
-            HippoApp.renderLedProcessorList();
-        }
+        // Always save so dashboard can read latest status
+        this._saveProcessors();
         // Update inline status elements only when page is active
-        if (this._isActive) this._updateStatusDisplay();
+        if (this._isActive) {
+            if (wasOnline !== this._status.online) {
+                this._refreshAll();
+            } else {
+                this._updateStatusDisplay();
+            }
+        }
     },
 
     _updateStatusDisplay() {
@@ -1228,7 +1480,7 @@ const LedProcessorPage = {
         if (!this._activeProc || this._activeProc.virtual) return;
         UI.toast(`Reconnecting to ${this._activeProc.name}...`, 'info');
         await this._fetchStatus();
-        this.refresh();
+        this._refreshAll();
         UI.toast(this._status.online ? `Connected to ${this._activeProc.name}` : `Cannot reach ${this._activeProc.name}`, this._status.online ? 'success' : 'error');
     },
 
@@ -1250,14 +1502,30 @@ const LedProcessorPage = {
     refresh() {
         const container = document.getElementById('page-container');
         if (container && appState.get('currentPage') === 'ledprocessor') {
-            container.innerHTML = this.render();
+            // If the page layout already exists, use targeted updates
+            if (document.getElementById('led-controls')) {
+                this._refreshAll();
+            } else {
+                container.innerHTML = this.render();
+            }
         }
     },
 
     onActivate() {
         this._isActive = true;
         this._loadProcessors();
+        // Auto-select first processor if none selected
+        if (!this._activeProc && this._processors.length > 0) {
+            this._activeProc = this._processors[0];
+            if (this._activeProc.virtual) {
+                this._status = this._virtualStatus(this._activeProc.type);
+            }
+        }
         this.refresh();
+        // Update sidebar with selection highlighting
+        if (typeof HippoApp !== 'undefined' && HippoApp.renderLedProcessorList) {
+            HippoApp.renderLedProcessorList();
+        }
         // Poll status every 5 seconds for live data updates
         if (this._activeProc && !this._activeProc.virtual) this._fetchStatus();
         if (!this._pollTimer) {
@@ -1269,7 +1537,10 @@ const LedProcessorPage = {
 
     onDeactivate() {
         this._isActive = false;
-        // Timer keeps running in background
+        if (this._pollTimer) {
+            clearInterval(this._pollTimer);
+            this._pollTimer = null;
+        }
     },
 };
 
@@ -1281,11 +1552,6 @@ const LedProcessorPage = {
     const style = document.createElement('style');
     style.id = 'led-page-css';
     style.textContent = `
-    .led-page { display: flex; flex-direction: column; gap: 16px; }
-    .led-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-    .led-toolbar-left { display: flex; align-items: center; gap: 8px; }
-    .led-toolbar-right { display: flex; align-items: center; gap: 8px; }
-
     .led-status { font-size: 11px; font-weight: 700; padding: 4px 12px; border-radius: 12px; letter-spacing: 0.5px; }
     .led-status-on { background: rgba(34,197,94,0.15); color: #4ade80; border: 1px solid rgba(34,197,94,0.3); }
     .led-status-off { background: rgba(239,68,68,0.15); color: #f87171; border: 1px solid rgba(239,68,68,0.3); }

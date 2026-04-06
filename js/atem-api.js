@@ -71,6 +71,36 @@ class ATEMApi {
     }
 
     // ================================================================
+    // COMPOSITE STATE
+    // ================================================================
+    async getState() {
+        const [info, inputs, tally] = await Promise.all([
+            this.getDeviceInfo().catch(() => ({})),
+            this.getInputs().catch(() => []),
+            this.getTally().catch(() => []),
+        ]);
+        const inputList = Array.isArray(inputs) ? inputs : [];
+        // Determine program/preview from tally
+        let programInput = null, previewInput = null;
+        if (Array.isArray(tally)) {
+            tally.forEach(t => { if (t.program) programInput = t.inputId ?? t.id; if (t.preview) previewInput = t.inputId ?? t.id; });
+        }
+        let macros = [], audioMixer = {}, dsks = [], usks = [], auxOutputs = [];
+        try { macros = await this.getMacros(); } catch {}
+        try { audioMixer = await this.getAudioMixer(); } catch {}
+        return {
+            inputs: inputList,
+            programInput: programInput ?? inputList[0]?.id ?? 1,
+            previewInput: previewInput ?? (inputList[1]?.id ?? 2),
+            macros: Array.isArray(macros) ? macros : [],
+            dsks: Array.isArray(dsks) ? dsks : [],
+            usks: Array.isArray(usks) ? usks : [],
+            auxOutputs: Array.isArray(auxOutputs) ? auxOutputs : [],
+            model: info.model || 'ATEM',
+        };
+    }
+
+    // ================================================================
     // HEALTH CHECK
     // ================================================================
 

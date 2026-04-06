@@ -345,6 +345,22 @@ class PixeraAPI {
     async getProjectSettings() { return this.rpc('Pixera.Project.getSettings'); }
 
     // ================================================================
+    // COMPOSITE STATE
+    // ================================================================
+    async getState() {
+        const [timelines, cues, screens, resources, devices] = await Promise.all([
+            this.getTimelines().catch(() => []),
+            this.getCues().catch(() => []),
+            this.getScreens().catch(() => []),
+            this.getResources().catch(() => []),
+            this.getDevices().catch(() => []),
+        ]);
+        let masterBrightness = 100;
+        let masterVolume = 100;
+        return { timelines: Array.isArray(timelines) ? timelines : [], cues: Array.isArray(cues) ? cues : [], screens: Array.isArray(screens) ? screens : [], resources: Array.isArray(resources) ? resources : [], devices: Array.isArray(devices) ? devices : [], masterBrightness, masterVolume };
+    }
+
+    // ================================================================
     // HEALTH CHECK
     // ================================================================
     async healthCheck() {
