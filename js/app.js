@@ -93,9 +93,8 @@ const HippoApp = {
             TimecodeGenPage._restoreState();
         }
 
-        // Navigate to hash or default — also save to localStorage for persistence
-        const hash = location.hash.replace('#', '') || localStorage.getItem('luxor_last_page') || 'dashboard';
-        this.navigate(hash);
+        // Always start on Dashboard — it's the home screen
+        this.navigate('dashboard');
 
         // Auto-reconnect to last active server on startup
         const servers = appState.get('servers');
@@ -103,8 +102,9 @@ const HippoApp = {
         const lastServer = lastServerId ? servers.find(s => s.id === lastServerId) : null;
         if (lastServer) {
             document.getElementById('server-select').value = lastServer.id;
-            // Save the page we want to stay on BEFORE reconnect overwrites it
-            this._startupPage = hash;
+            // Restore the last page only when reconnecting to a server
+            const savedPage = location.hash.replace('#', '') || localStorage.getItem('luxor_last_page');
+            this._startupPage = savedPage && this.pages[savedPage] ? savedPage : null;
             setTimeout(() => this.switchServer(lastServerId), 200);
         } else {
             // Hide nav until a server is connected
