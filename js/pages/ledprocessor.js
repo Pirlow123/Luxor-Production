@@ -44,7 +44,7 @@ const LedProcessorPage = {
             { id: 'JX1', name: 'JX1', api: 'http', port: 8001, desc: 'Compact multimedia player + sender', icon: 'fa-play-circle', hasScaler: false, hasHDR: false, hasGenlock: false, hasMediaPlayer: true, role: 'player' },
         ],
         'Megapixel': [
-            { id: 'Helios', name: 'Helios', api: 'http', port: 80, desc: '8-port, 4K60, HDR, 10-bit LED processor', icon: 'fa-sun', brand: 'megapixel', hasScaler: true, hasHDR: true, hasGenlock: true, hasMediaPlayer: false, role: 'processor' },
+            { id: 'Helios', name: 'Helios', api: 'http', port: 80, altPorts: [80, 443, 8080], desc: '8-port, 4K60, HDR, 10-bit LED processor', icon: 'fa-sun', brand: 'megapixel', hasScaler: true, hasHDR: true, hasGenlock: true, hasMediaPlayer: false, role: 'processor' },
         ],
         'Brompton': [
             { id: 'Tessera SX40', name: 'Tessera SX40', api: 'http', port: 80, desc: '4-port, 4K, flagship processor', icon: 'fa-gem', brand: 'brompton', hasScaler: true, hasHDR: true, hasGenlock: true, hasMediaPlayer: false, role: 'processor' },
@@ -154,7 +154,7 @@ const LedProcessorPage = {
                         <tr><td>Host</td><td class="mono">${UI.esc(p.host)}:${p.port}</td></tr>
                         <tr><td>Firmware</td><td class="mono">${UI.esc(s.firmware || '--')}</td></tr>
                         <tr><td>Serial</td><td class="mono">${UI.esc(s.serial || '--')}</td></tr>
-                        <tr><td>Status</td><td>${s.online ? '<span style="color:#4ade80">Online</span>' : '<span style="color:#f87171">Offline</span>'}</td></tr>
+                        <tr><td>Status</td><td>${s.online ? '<span style="color:#4ade80">Online</span>' : s._corsBlocked ? '<span style="color:#fbbf24" title="Device found but browser CORS blocks API access. Use the Electron desktop app.">CORS Blocked</span>' : '<span style="color:#f87171">Offline</span>'}</td></tr>
                         <tr><td>Display Mode</td><td>${UI.esc(s.displayMode || 'Normal')}</td></tr>
                         <tr><td>Outputs</td><td>${s.outputs || '--'}</td></tr>
                         <tr><td>Temperature</td><td class="mono">${s.temperature ? s.temperature + '°C' : '--'}</td></tr>
@@ -714,21 +714,47 @@ const LedProcessorPage = {
     // ================================================================
     // ACTIONS — send to API
     // ================================================================
+    // Helios POST helper — sends nested JSON to /api/v1/public
+    async _heliosPost(nestedBody) {
+        if (!this._activeProc || this._activeProc.virtual) return null;
+        const proto = this._activeProc.port === 443 ? 'https' : 'http';
+        const host = `${proto}://${this._activeProc.host}:${this._activeProc.port}`;
+        try {
+            const resp = await fetch(`${host}/api/v1/public`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(nestedBody),
+                signal: AbortSignal.timeout(5000),
+            });
+            if (resp.ok) { try { return await resp.json(); } catch { return null; } }
+        } catch {}
+        return null;
+    },
+
     async setBrightness(val) {
         const v = parseInt(val);
         this._status.brightness = v;
         const el = document.getElementById('led-brightness-val');
         if (el) el.textContent = `${v}%`;
-        // Update slider
         const slider = document.querySelector('.led-brightness-slider');
         if (slider && slider !== document.activeElement) slider.value = v;
-        await this._apiAction('PUT', 'setBright', { brightness: v, value: v, level: v });
+        const brand = this._activeProc ? this._getBrand(this._activeProc) : null;
+        if (brand === 'megapixel') {
+            await this._heliosPost({ dev: { display: { brightness: v } } });
+        } else {
+            await this._apiAction('PUT', 'setBright', { brightness: v, value: v, level: v });
+        }
         appState.log('EVENT', `LED brightness → ${v}%`, 'LED');
     },
 
     async setDisplayMode(mode) {
         this._status.displayMode = mode;
-        await this._apiAction('PUT', 'setMode', { mode: mode.toLowerCase(), displayMode: mode });
+        const brand = this._activeProc ? this._getBrand(this._activeProc) : null;
+        if (brand === 'megapixel') {
+            await this._heliosPost({ dev: { display: { blackout: mode === 'Blackout' } } });
+        } else {
+            await this._apiAction('PUT', 'setMode', { mode: mode.toLowerCase(), displayMode: mode });
+        }
         UI.toast(`Display mode: ${mode}`, mode === 'Blackout' ? 'warning' : 'info');
         appState.log('EVENT', `LED display mode → ${mode}`, 'LED');
         this.refresh();
@@ -736,7 +762,12 @@ const LedProcessorPage = {
 
     async setInput(input) {
         this._status.activeInput = input;
-        await this._apiAction('PUT', 'setInput', { source: input, input, activeInput: input });
+        const brand = this._activeProc ? this._getBrand(this._activeProc) : null;
+        if (brand === 'megapixel') {
+            await this._heliosPost({ dev: { ingest: { input: input } } });
+        } else {
+            await this._apiAction('PUT', 'setInput', { source: input, input, activeInput: input });
+        }
         UI.toast(`Input: ${input}`, 'success');
         appState.log('EVENT', `LED input → ${input}`, 'LED');
         this.refresh();
@@ -744,20 +775,46 @@ const LedProcessorPage = {
 
     async setTestPattern(pattern) {
         this._status.testPattern = pattern === 'Off' ? null : pattern;
-        await this._apiAction('PUT', 'setPattern', { mode: pattern.toLowerCase(), pattern, state: pattern !== 'Off', enabled: pattern !== 'Off' });
+        const brand = this._activeProc ? this._getBrand(this._activeProc) : null;
+        if (brand === 'megapixel') {
+            await this._heliosPost({ dev: { ingest: { testPattern: { enabled: pattern !== 'Off', type: pattern === 'Off' ? '' : pattern.toLowerCase() } } } });
+        } else {
+            await this._apiAction('PUT', 'setPattern', { mode: pattern.toLowerCase(), pattern, state: pattern !== 'Off', enabled: pattern !== 'Off' });
+        }
         UI.toast(pattern === 'Off' ? 'Test pattern off' : `Test pattern: ${pattern}`, 'info');
         this.refresh();
     },
 
     async setGamma(val) {
         this._status.gamma = parseFloat(val);
-        await this._apiAction('PUT', 'setGamma', { gamma: parseFloat(val), value: parseFloat(val) });
+        const brand = this._activeProc ? this._getBrand(this._activeProc) : null;
+        if (brand === 'megapixel') {
+            await this._heliosPost({ dev: { display: { gamma: parseFloat(val) } } });
+        } else {
+            await this._apiAction('PUT', 'setGamma', { gamma: parseFloat(val), value: parseFloat(val) });
+        }
         this.refresh();
     },
 
     async loadPreset(name) {
         this._status.activePreset = name;
-        await this._apiAction('POST', 'setPreset', { name, preset: name });
+        const brand = this._activeProc ? this._getBrand(this._activeProc) : null;
+        if (brand === 'megapixel') {
+            // Helios presets use a separate endpoint
+            if (!this._activeProc.virtual) {
+                const host = `http://${this._activeProc.host}:${this._activeProc.port}`;
+                try {
+                    await fetch(`${host}/api/v1/presets/apply`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ name }),
+                        signal: AbortSignal.timeout(5000),
+                    });
+                } catch {}
+            }
+        } else {
+            await this._apiAction('POST', 'setPreset', { name, preset: name });
+        }
         UI.toast(`Preset: ${name}`, 'success');
         appState.log('EVENT', `LED preset → ${name}`, 'LED');
         this.refresh();
@@ -769,13 +826,34 @@ const LedProcessorPage = {
     async _heliosAction(action, value) {
         const s = this._status;
         switch (action) {
-            case 'toggleDynCal': s.dynCalEnabled = !s.dynCalEnabled; await this._apiCall('PUT', '/calibration/dynamic', { enabled: s.dynCalEnabled }); break;
-            case 'recalibrate': await this._apiCall('POST', '/calibration/recalibrate'); UI.toast('Recalibrating...', 'info'); break;
-            case 'toggleLowLatency': s.lowLatency = !s.lowLatency; await this._apiCall('PUT', '/processing/lowlatency', { enabled: s.lowLatency }); break;
-            case 'toggleFrameRemap': s.frameRemap = !s.frameRemap; await this._apiCall('PUT', '/output/frameremap', { enabled: s.frameRemap }); break;
-            case 'setColorSpace': s.colorSpace = value; await this._apiCall('PUT', '/color/space', { space: value }); break;
-            case 'setHDR': s.hdrMode = value; await this._apiCall('PUT', '/color/hdr', { mode: value }); break;
-            case 'setGenlock': s.genlock = value; await this._apiCall('PUT', '/sync/genlock', { source: value }); break;
+            case 'toggleDynCal':
+                s.dynCalEnabled = !s.dynCalEnabled;
+                await this._heliosPost({ dev: { display: { dynamicCalibration: s.dynCalEnabled } } });
+                break;
+            case 'recalibrate':
+                await this._heliosPost({ dev: { display: { recalibrate: true } } });
+                UI.toast('Recalibrating...', 'info');
+                break;
+            case 'toggleLowLatency':
+                s.lowLatency = !s.lowLatency;
+                await this._heliosPost({ dev: { display: { lowLatency: s.lowLatency } } });
+                break;
+            case 'toggleFrameRemap':
+                s.frameRemap = !s.frameRemap;
+                await this._heliosPost({ dev: { display: { frameRemap: s.frameRemap } } });
+                break;
+            case 'setColorSpace':
+                s.colorSpace = value;
+                await this._heliosPost({ dev: { display: { colorSpace: value } } });
+                break;
+            case 'setHDR':
+                s.hdrMode = value;
+                await this._heliosPost({ dev: { display: { hdrMode: value } } });
+                break;
+            case 'setGenlock':
+                s.genlock = value;
+                await this._heliosPost({ dev: { display: { genlock: value } } });
+                break;
         }
         appState.log('EVENT', `Helios ${action}${value ? ': ' + value : ''}`, 'LED');
         this.refresh();
@@ -1304,20 +1382,53 @@ const LedProcessorPage = {
     _bromptonEndpoints: { hw: '/api/system/info', bright: '/api/processor/brightness', input: '/api/processor/input', temp: '/api/system/temperature', prefix: '/api',
         setBright: '/api/processor/brightness', setInput: '/api/processor/input', setMode: '/api/processor/displaymode', setPattern: '/api/processor/test-pattern',
         setGamma: '/api/processor/gamma', setPreset: '/api/processor/preset', setScaling: '/api/processor/scaling', setCal: '/api/processor/calibration' },
-    _megapixelEndpoints: { hw: '/api/v1/system', bright: '/api/v1/brightness', input: '/api/v1/input', temp: '/api/v1/system/temperature', prefix: '/api/v1',
-        setBright: '/api/v1/brightness', setInput: '/api/v1/input', setMode: '/api/v1/displaymode', setPattern: '/api/v1/test-pattern',
-        setGamma: '/api/v1/gamma', setPreset: '/api/v1/preset', setScaling: '/api/v1/scaling', setCal: '/api/v1/calibration' },
+    // Megapixel Helios uses a SINGLE endpoint /api/v1/public for all state (GET = read all, POST = write partial)
+    _megapixelEndpoints: {
+        hw: '/api/v1/public',          // Single endpoint returns ALL state
+        bright: '/api/v1/public',      // Same endpoint — brightness is in data.dev.display.brightness
+        input: '/api/v1/public',       // Same endpoint — input is in data.dev.ingest.input
+        temp: '/api/v1/public',        // Same endpoint — temp not separate
+        prefix: '/api/v1',
+        // Write actions all POST to /api/v1/public with nested JSON
+        setBright: '/api/v1/public',
+        setInput: '/api/v1/public',
+        setMode: '/api/v1/public',
+        setPattern: '/api/v1/public',
+        setGamma: '/api/v1/public',
+        setPreset: '/api/v1/presets/apply',
+        setScaling: '/api/v1/public',
+        setCal: '/api/v1/public',
+        presetsList: '/api/v1/presets/list',
+    },
 
     // Cached working endpoint pattern per processor
     _workingEndpoints: {},
 
     async _tryFetch(url, timeout = 4000) {
         try {
-            const resp = await fetch(url, { signal: AbortSignal.timeout(timeout) });
+            const resp = await fetch(url, {
+                signal: AbortSignal.timeout(timeout),
+                mode: 'cors',
+            });
             if (resp.ok) return resp;
             // Accept 401/403 as "device is there but needs auth" — still count as connected
             if (resp.status === 401 || resp.status === 403) return resp;
-        } catch {}
+        } catch (e) {
+            // CORS error in browser — try no-cors to at least detect reachability
+            // (opaque response, can't read body but confirms device is there)
+            try {
+                const resp2 = await fetch(url, {
+                    signal: AbortSignal.timeout(timeout),
+                    mode: 'no-cors',
+                });
+                // no-cors gives status 0 opaque response — device is reachable but CORS blocked
+                if (resp2.type === 'opaque') {
+                    console.warn(`[LED] Device reachable but CORS blocked: ${url}. Use the Electron app for full connectivity.`);
+                    // Return a synthetic response to indicate "online but can't read data"
+                    return { ok: false, status: 0, _corsBlocked: true, json: async () => ({}) };
+                }
+            } catch {}
+        }
         return null;
     },
 
@@ -1328,11 +1439,13 @@ const LedProcessorPage = {
         const wasOnline = this._status.online;
         const modelInfo = this._getModelInfo(this._activeProc.type);
 
-        // Build list of host:port combos to try (for COEX, try alternate ports)
-        const hosts = [`http://${this._activeProc.host}:${this._activeProc.port}`];
+        // Build list of host:port combos to try (for COEX/Helios, try alternate ports)
+        const proto = this._activeProc.port === 443 ? 'https' : 'http';
+        const hosts = [`${proto}://${this._activeProc.host}:${this._activeProc.port}`];
         if (modelInfo?.altPorts) {
             for (const p of modelInfo.altPorts) {
-                const h = `http://${this._activeProc.host}:${p}`;
+                const scheme = p === 443 ? 'https' : 'http';
+                const h = `${scheme}://${this._activeProc.host}:${p}`;
                 if (!hosts.includes(h)) hosts.push(h);
             }
         }
@@ -1370,6 +1483,19 @@ const LedProcessorPage = {
                     const hwResp = await this._tryFetch(`${host}${endpoints.hw}`);
                     if (!hwResp) continue;
 
+                    // CORS blocked in browser — device is reachable but can't read data
+                    if (hwResp._corsBlocked) {
+                        status.online = false;
+                        status._corsBlocked = true;
+                        this._status = status;
+                        if (!this._corsWarned) {
+                            this._corsWarned = true;
+                            UI.toast('Device reachable but blocked by browser CORS policy. Use the desktop Electron app for full connectivity.', 'warning', 8000);
+                        }
+                        this._refreshAll();
+                        return;
+                    }
+
                     // This endpoint pattern works — cache it and update port if needed
                     this._workingEndpoints[procId] = endpoints;
                     online = true;
@@ -1383,31 +1509,66 @@ const LedProcessorPage = {
 
                     try {
                         const data = await hwResp.json();
-                        Object.assign(status, {
-                            online: true,
-                            firmware: data.firmware || data.version || data.softwareVersion || data.sw_version || status.firmware || '--',
-                            model: data.model || data.productName || data.deviceModel || data.product_name || status.model,
-                            serial: data.serial || data.serialNumber || data.sn || data.serial_number || status.serial,
-                            outputs: data.outputs || data.portCount || data.output_count || status.outputs,
-                            displayMode: data.displayMode || data.display_mode || data.mode || status.displayMode,
-                        });
+
+                        // Megapixel Helios: single /api/v1/public endpoint returns everything under data.dev.*
+                        if (brand === 'megapixel' && data?.data?.dev) {
+                            const dev = data.data.dev;
+                            const disp = dev.display || {};
+                            const ingest = dev.ingest || {};
+                            const sys = dev.system || dev.info || {};
+                            Object.assign(status, {
+                                online: true,
+                                firmware: sys.firmware || sys.version || sys.sw_version || status.firmware || '--',
+                                model: sys.model || sys.productName || 'Helios',
+                                serial: sys.serial || sys.serialNumber || status.serial,
+                                brightness: disp.brightness ?? status.brightness,
+                                gamma: disp.gamma ?? status.gamma,
+                                colorTemp: disp.cct ?? status.colorTemp,
+                                outputWidth: disp.width ?? status.outputWidth,
+                                outputHeight: disp.height ?? status.outputHeight,
+                                displayMode: disp.blackout ? 'Blackout' : 'Normal',
+                                activeInput: ingest.input ?? status.activeInput,
+                                testPattern: ingest.testPattern?.enabled ? (ingest.testPattern.type || 'On') : null,
+                                // Helios-specific fields
+                                _heliosRaw: dev,
+                                redundancyState: disp.redundancy?.state,
+                                redundancyRole: disp.redundancy?.role,
+                            });
+                            // Parse available inputs from ingest.inputs
+                            if (ingest.inputs) {
+                                status.inputs = Object.keys(ingest.inputs).filter(k => ingest.inputs[k]?.valid !== false);
+                            }
+                        } else {
+                            // Novastar / Brompton: standard per-field parsing
+                            Object.assign(status, {
+                                online: true,
+                                firmware: data.firmware || data.version || data.softwareVersion || data.sw_version || status.firmware || '--',
+                                model: data.model || data.productName || data.deviceModel || data.product_name || status.model,
+                                serial: data.serial || data.serialNumber || data.sn || data.serial_number || status.serial,
+                                outputs: data.outputs || data.portCount || data.output_count || status.outputs,
+                                displayMode: data.displayMode || data.display_mode || data.mode || status.displayMode,
+                            });
+                        }
                     } catch { status.online = true; }
 
-                    // Fetch brightness, input, temp in parallel with the working base
-                    const [brightResp, inputResp, tempResp] = await Promise.allSettled([
-                        this._tryFetch(`${host}${endpoints.bright}`),
-                        this._tryFetch(`${host}${endpoints.input}`),
-                        this._tryFetch(`${host}${endpoints.temp}`),
-                    ]);
+                    // For Megapixel, all data came from the single request above — skip parallel fetches
+                    if (brand !== 'megapixel') {
+                        // Fetch brightness, input, temp in parallel with the working base
+                        const [brightResp, inputResp, tempResp] = await Promise.allSettled([
+                            this._tryFetch(`${host}${endpoints.bright}`),
+                            this._tryFetch(`${host}${endpoints.input}`),
+                            this._tryFetch(`${host}${endpoints.temp}`),
+                        ]);
 
-                    if (brightResp.status === 'fulfilled' && brightResp.value) {
-                        try { const d = await brightResp.value.json(); status.brightness = d.brightness ?? d.value ?? d.level ?? d.screen_brightness ?? status.brightness; } catch {}
-                    }
-                    if (inputResp.status === 'fulfilled' && inputResp.value) {
-                        try { const d = await inputResp.value.json(); status.activeInput = d.source ?? d.input ?? d.activeInput ?? d.active_input ?? d.input_source ?? status.activeInput; } catch {}
-                    }
-                    if (tempResp.status === 'fulfilled' && tempResp.value) {
-                        try { const d = await tempResp.value.json(); status.temperature = d.temperature ?? d.temp ?? d.cpuTemp ?? d.cpu_temp ?? d.board_temp ?? status.temperature; } catch {}
+                        if (brightResp.status === 'fulfilled' && brightResp.value) {
+                            try { const d = await brightResp.value.json(); status.brightness = d.brightness ?? d.value ?? d.level ?? d.screen_brightness ?? status.brightness; } catch {}
+                        }
+                        if (inputResp.status === 'fulfilled' && inputResp.value) {
+                            try { const d = await inputResp.value.json(); status.activeInput = d.source ?? d.input ?? d.activeInput ?? d.active_input ?? d.input_source ?? status.activeInput; } catch {}
+                        }
+                        if (tempResp.status === 'fulfilled' && tempResp.value) {
+                            try { const d = await tempResp.value.json(); status.temperature = d.temperature ?? d.temp ?? d.cpuTemp ?? d.cpu_temp ?? d.board_temp ?? status.temperature; } catch {}
+                        }
                     }
 
                     break; // Found a working pattern, stop trying
@@ -1466,7 +1627,7 @@ const LedProcessorPage = {
         const badge = document.querySelector('.led-status');
         if (badge) {
             badge.className = `led-status ${this._status.online ? 'led-status-on' : 'led-status-off'}`;
-            badge.textContent = this._status.online ? 'ONLINE' : 'OFFLINE';
+            badge.textContent = this._status.online ? 'ONLINE' : this._status._corsBlocked ? 'CORS BLOCKED' : 'OFFLINE';
         }
         // Update brightness display
         const brightEl = document.getElementById('led-brightness-val');
@@ -1481,7 +1642,7 @@ const LedProcessorPage = {
         UI.toast(`Reconnecting to ${this._activeProc.name}...`, 'info');
         await this._fetchStatus();
         this._refreshAll();
-        UI.toast(this._status.online ? `Connected to ${this._activeProc.name}` : `Cannot reach ${this._activeProc.name}`, this._status.online ? 'success' : 'error');
+        UI.toast(this._status.online ? `Connected to ${this._activeProc.name}` : this._status._corsBlocked ? `${this._activeProc.name} reachable but CORS blocked — use the Electron app` : `Cannot reach ${this._activeProc.name}`, this._status.online ? 'success' : this._status._corsBlocked ? 'warning' : 'error');
     },
 
     _saveProcessors() {
