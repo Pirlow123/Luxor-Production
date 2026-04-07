@@ -213,6 +213,9 @@
     height: 380px;
     overflow: hidden;
     cursor: grab;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 .dash-topo-canvas-wrap.dragging { cursor: grabbing; }
 .dash-topo-canvas {

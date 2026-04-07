@@ -1482,11 +1482,9 @@ const DashboardPage = {
         };
         window.addEventListener('resize', this._dashTopoResize);
 
-        // Sync devices + start rendering
+        // Sync devices + start rendering — positions are restored from localStorage inside syncDevices
+        TopologyPage._hasPositions = false;
         TopologyPage.syncDevices();
-        if (TopologyPage._nodes.length > 0 && !TopologyPage._pan.x && !TopologyPage._pan.y) {
-            setTimeout(() => TopologyPage._fitView(), 100);
-        }
 
         const renderLoop = () => {
             if (!this._dashTopoActive) return;

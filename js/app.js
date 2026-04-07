@@ -98,18 +98,26 @@ const HippoApp = {
         // Always start on Dashboard — it's the home screen
         this.navigate('dashboard');
 
-        // Auto-reconnect to last active server on startup
+        // Restore last page from URL hash or localStorage
+        const savedPage = location.hash.replace('#', '') || localStorage.getItem('luxor_last_page');
+
+        // Auto-reconnect to last active server on startup — but only if the user
+        // was on a server-specific page, not the home dashboard / topology
         const servers = appState.get('servers');
         const lastServerId = localStorage.getItem('luxor_last_server');
         const lastServer = lastServerId ? servers.find(s => s.id === lastServerId) : null;
-        if (lastServer) {
+        const homePages = ['dashboard', 'topology', 'settings', 'ledprocessor', 'ptz', 'netswitch', 'lighting', 'intercom', 'loadcell', 'logs'];
+        const wasOnHomePage = !savedPage || homePages.includes(savedPage);
+
+        if (lastServer && !wasOnHomePage) {
             document.getElementById('server-select').value = lastServer.id;
-            // Restore the last page only when reconnecting to a server
-            const savedPage = location.hash.replace('#', '') || localStorage.getItem('luxor_last_page');
             this._startupPage = savedPage && this.pages[savedPage] ? savedPage : null;
             setTimeout(() => this.switchServer(lastServerId), 200);
         } else {
-            // Hide nav until a server is connected
+            // Restore the page the user was on (dashboard, topology, etc.)
+            if (savedPage && this.pages[savedPage]) {
+                this.navigate(savedPage);
+            }
             this.updateNavVisibility(null);
         }
 
