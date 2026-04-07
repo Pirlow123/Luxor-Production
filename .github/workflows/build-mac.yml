@@ -2,10 +2,14 @@ name: Build macOS Installer
 
 on:
   workflow_dispatch:
+  release:
+    types: [published]
 
 jobs:
   build-mac:
     runs-on: macos-latest
+    permissions:
+      contents: write
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -18,16 +22,45 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      - name: Build macOS installer
-        run: npm run build:mac
+      - name: Build macOS installer (universal)
+        run: npx electron-builder --mac --universal
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Upload DMG
+      - name: List build output
+        run: ls -la release/
+
+      - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: Luxor-Production-macOS
           path: |
             release/*.dmg
             release/*.zip
+            release/latest-mac.yml
           retention-days: 90
+
+      - name: Attach to GitHub Release
+        if: github.event_name == 'release' || github.event_name == 'workflow_dispatch'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Find the latest release tag
+          if [ "${{ github.event_name }}" = "release" ]; then
+            TAG="${{ github.event.release.tag_name }}"
+          else
+            TAG=$(gh release list --limit 1 --json tagName -q '.[0].tagName')
+          fi
+          echo "Uploading to release: $TAG"
+
+          # Upload DMG, zip, and latest-mac.yml
+          for f in release/*.dmg release/*.zip; do
+            if [ -f "$f" ]; then
+              echo "Uploading: $f"
+              gh release upload "$TAG" "$f" --clobber
+            fi
+          done
+
+          if [ -f "release/latest-mac.yml" ]; then
+            gh release upload "$TAG" "release/latest-mac.yml" --clobber
+          fi
