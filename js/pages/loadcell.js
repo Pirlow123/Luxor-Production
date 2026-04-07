@@ -8,6 +8,8 @@ const LoadCellPage = {
     _cells: [],        // { id, name, address, host, online, value, unit, min, max, avg, peak, tare, underload, warning, overload, battery, signal, lastUpdate, log:[] }
     _activeCell: null,
     _connected: false,
+    _simulated: false,    // true = simulation mode (no real DLL/hardware)
+    _baseStationId: null, // real base station hex ID
     _comPort: '',
     _isActive: false,
     _simTimer: null,
@@ -35,9 +37,12 @@ const LoadCellPage = {
                     ? `<button class="btn btn-sm btn-danger" onclick="LoadCellPage._disconnect()"><i class="fas fa-unlink"></i> Disconnect</button>`
                     : `<button class="btn btn-sm btn-primary" onclick="LoadCellPage._connect()"><i class="fas fa-link"></i> Connect</button>`
                 }
-                <span class="lc-conn-badge ${this._connected ? 'lc-conn-online' : 'lc-conn-offline'}">
-                    <span class="lc-conn-dot"></span> ${this._connected ? 'CONNECTED' : 'OFFLINE'}
+                <span class="lc-conn-badge ${this._connected ? (this._simulated ? 'lc-conn-sim' : 'lc-conn-online') : 'lc-conn-offline'}">
+                    <span class="lc-conn-dot"></span> ${this._connected
+                        ? (this._simulated ? 'SIMULATED' : 'HARDWARE')
+                        : 'OFFLINE'}
                 </span>
+                ${this._connected && this._baseStationId ? `<span style="font-size:9px;color:var(--text-muted);font-family:'JetBrains Mono',monospace;">BS: ${this._baseStationId}</span>` : ''}
                 <button class="btn btn-sm btn-primary" onclick="LoadCellPage.showAddCell()"><i class="fas fa-plus"></i> Add Load Cell</button>
             </div>
         </div>
@@ -526,6 +531,8 @@ const LoadCellPage = {
         if (isElectron) {
             // Real bridge via Electron IPC
             UI.toast('Starting Broadweigh bridge...', 'info');
+            this._simulated = false;
+            this._baseStationId = null;
             const result = await window.luxorBroadweigh.start();
             if (!result.ok) {
                 UI.toast(result.error || 'Failed to start bridge', 'error');
@@ -539,7 +546,9 @@ const LoadCellPage = {
             const port = document.getElementById('lc-com-port')?.value;
             this._comPort = port || 'SIM';
             this._connected = true;
-            UI.toast('Connected (simulation mode)', 'success');
+            this._simulated = true;
+            this._baseStationId = null;
+            UI.toast('Connected (simulation mode — no Electron/DLL)', 'warning');
             this._cells.forEach(c => this._bringOnline(c));
             this._startSimulation();
         }
@@ -552,6 +561,8 @@ const LoadCellPage = {
             await window.luxorBroadweigh.stop();
         }
         this._connected = false;
+        this._simulated = false;
+        this._baseStationId = null;
         this._stopSimulation();
         this._cells.forEach(c => {
             c.online = false;
@@ -583,19 +594,25 @@ const LoadCellPage = {
             } else if (data.type === 'status') {
                 if (data.connected === false) {
                     this._connected = false;
+                    this._simulated = false;
+                    this._baseStationId = null;
                     this._cells.forEach(c => { c.online = false; });
                     this._refreshAll();
                     if (data.reason) UI.toast(`Bridge: ${data.reason}`, 'warning');
                 } else if (data.simulated) {
-                    UI.toast('Running in simulation mode (no DLL/hardware detected)', 'warning');
-                    // In simulation mode, bring all cells online
+                    this._simulated = true;
+                    this._baseStationId = null;
+                    UI.toast('Running in SIMULATION mode (no DLL/hardware detected)', 'warning');
                     this._cells.forEach(c => this._bringOnline(c));
+                    this._refreshAll();
                 } else {
+                    this._simulated = false;
                     if (data.baseStationId) {
+                        this._baseStationId = data.baseStationId;
                         UI.toast(`Base station connected (ID: ${data.baseStationId}, Ch: ${data.channel})`, 'success');
                     }
-                    // Wake existing cells
                     this._cells.forEach(c => this._bringOnline(c));
+                    this._refreshAll();
                 }
                 this._refreshAll();
             } else if (data.type === 'error') {
@@ -824,11 +841,13 @@ const LoadCellPage = {
             padding: 4px 12px; border-radius: 12px;
         }
         .lc-conn-online { background: rgba(74,222,128,0.15); color: #4ade80; border: 1px solid rgba(74,222,128,0.3); }
+        .lc-conn-sim { background: rgba(250,204,21,0.15); color: #facc15; border: 1px solid rgba(250,204,21,0.3); }
         .lc-conn-offline { background: rgba(107,114,128,0.15); color: #9ca3af; border: 1px solid rgba(107,114,128,0.3); }
         .lc-conn-dot {
             width: 7px; height: 7px; border-radius: 50%;
         }
         .lc-conn-online .lc-conn-dot { background: #4ade80; box-shadow: 0 0 6px #4ade8080; }
+        .lc-conn-sim .lc-conn-dot { background: #facc15; box-shadow: 0 0 6px #facc1580; }
         .lc-conn-offline .lc-conn-dot { background: #6b7280; }
 
         /* Top bar — large weight display */

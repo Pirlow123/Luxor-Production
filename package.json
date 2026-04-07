@@ -1,6 +1,6 @@
 {
   "name": "luxor-production",
-  "version": "1.5.1",
+  "version": "1.5.2",
   "description": "Luxor Production — Universal control interface for media servers, LED processors, PTZ cameras, network switches, lighting consoles, and intercom systems",
   "main": "electron-main.js",
   "author": "Luxor Productions",
