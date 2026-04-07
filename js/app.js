@@ -48,6 +48,7 @@ const HippoApp = {
         showclock:    ShowClockPage,
         specifications: SpecificationsPage,
         topology:     TopologyPage,
+        engines:      EnginesPage,
         enginemedia:  EngineMediaPage,
         enginemixing: EngineMixingPage,
         settings:     SettingsPage,
@@ -493,7 +494,7 @@ const HippoApp = {
             const wasOnline = statuses[s.id]?.online;
             const dotColor = isOnline ? '#4ade80' : isActive ? '#f59e0b' : wasOnline ? '#4ade80' : '#6b7280';
             // Only show green selected border when user is on an engine-related page
-            const engineRelatedPages = ['showrun', 'dashboard', 'composition', 'timelines', 'media', 'mixes', 'presets', 'pins', 'timecode', 'status', 'enginemedia', 'enginemixing'];
+            const engineRelatedPages = ['showrun', 'dashboard', 'engines', 'composition', 'timelines', 'media', 'mixes', 'presets', 'pins', 'timecode', 'status', 'enginemedia', 'enginemixing'];
             const isOnEnginePage = isActive && engineRelatedPages.includes(currentPage);
 
             let html = `

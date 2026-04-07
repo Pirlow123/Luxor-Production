@@ -1187,7 +1187,7 @@ const TopologyPage = {
 
     _fitView() {
         if (this._nodes.length === 0) return;
-        const padding = 80;
+        const padding = 60;
         let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
         this._nodes.forEach(n => {
             minX = Math.min(minX, n.x);
@@ -1199,7 +1199,8 @@ const TopologyPage = {
         const contentH = maxY - minY + padding * 2;
         const canvasW = this._canvas?.clientWidth || 800;
         const canvasH = this._canvas?.clientHeight || 600;
-        this._zoom = Math.min(canvasW / contentW, canvasH / contentH, 1.5);
+        // Allow zoom to shrink as needed (min 0.1), cap at 1.2 so it doesn't over-zoom on few devices
+        this._zoom = Math.max(0.1, Math.min(canvasW / contentW, canvasH / contentH, 1.2));
         this._pan.x = (canvasW - contentW * this._zoom) / 2 - minX * this._zoom + padding * this._zoom;
         this._pan.y = (canvasH - contentH * this._zoom) / 2 - minY * this._zoom + padding * this._zoom;
         const el = document.getElementById(this._zoomInfoId || 'topo-zoom');
