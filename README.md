@@ -67,7 +67,7 @@ Universal production control platform for live events, broadcast, and AV install
 
 ## Changelog
 
-### v1.5.0 — April 2025
+### v1.5.0 — April 2026
 
 #### What's New
 - **Universal Engine Media Page** — Dedicated media browser for all non-Hippo engines with engine-specific features
@@ -90,7 +90,7 @@ Universal production control platform for live events, broadcast, and AV install
 
 ---
 
-### v1.4.0 — March 2025
+### v1.4.0 — March 2026
 
 #### What's New
 - Major UI overhaul with new sidebar dock navigation
@@ -101,7 +101,7 @@ Universal production control platform for live events, broadcast, and AV install
 
 ---
 
-### v1.3.0 — March 2025
+### v1.3.0 — March 2026
 
 #### What's New
 - Blackmagic ATEM support (program/preview, transitions, keyers, macros, media pool)
