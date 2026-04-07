@@ -6,6 +6,8 @@ const TopologyPage = {
     _nodes: [],          // { id, type, name, ip, online, x, y, width, height, icon, color, deviceRef }
     _connections: [],    // { from, to, label, color }
     _isActive: false,
+    _infoPanelId: null,  // override for dashboard embed
+    _zoomInfoId: null,   // override for dashboard embed
     _canvas: null,
     _ctx: null,
     _dragNode: null,
@@ -545,7 +547,7 @@ const TopologyPage = {
         this._pan.y = my - (my - this._pan.y) * (newZoom / this._zoom);
         this._zoom = newZoom;
 
-        const el = document.getElementById('topo-zoom');
+        const el = document.getElementById(this._zoomInfoId || 'topo-zoom');
         if (el) el.textContent = `${Math.round(this._zoom * 100)}%`;
     },
 
@@ -564,7 +566,7 @@ const TopologyPage = {
     // INFO PANEL
     // ════════════════════════════════════════════════════════════════
     _showInfoPanel(node) {
-        const el = document.getElementById('topo-info');
+        const el = document.getElementById(this._infoPanelId || 'topo-info');
         if (!el) return;
 
         const d = node.deviceRef || {};
@@ -619,7 +621,7 @@ const TopologyPage = {
     },
 
     _hideInfoPanel() {
-        const el = document.getElementById('topo-info');
+        const el = document.getElementById(this._infoPanelId || 'topo-info');
         if (el) el.style.display = 'none';
     },
 
@@ -694,12 +696,12 @@ const TopologyPage = {
         this._zoom = Math.min(canvasW / contentW, canvasH / contentH, 1.5);
         this._pan.x = (canvasW - contentW * this._zoom) / 2 - minX * this._zoom + padding * this._zoom;
         this._pan.y = (canvasH - contentH * this._zoom) / 2 - minY * this._zoom + padding * this._zoom;
-        const el = document.getElementById('topo-zoom');
+        const el = document.getElementById(this._zoomInfoId || 'topo-zoom');
         if (el) el.textContent = `${Math.round(this._zoom * 100)}%`;
     },
 
-    _zoomIn() { this._zoom = Math.min(3, this._zoom * 1.2); const el = document.getElementById('topo-zoom'); if (el) el.textContent = `${Math.round(this._zoom * 100)}%`; },
-    _zoomOut() { this._zoom = Math.max(0.2, this._zoom / 1.2); const el = document.getElementById('topo-zoom'); if (el) el.textContent = `${Math.round(this._zoom * 100)}%`; },
+    _zoomIn() { this._zoom = Math.min(3, this._zoom * 1.2); const el = document.getElementById(this._zoomInfoId || 'topo-zoom'); if (el) el.textContent = `${Math.round(this._zoom * 100)}%`; },
+    _zoomOut() { this._zoom = Math.max(0.2, this._zoom / 1.2); const el = document.getElementById(this._zoomInfoId || 'topo-zoom'); if (el) el.textContent = `${Math.round(this._zoom * 100)}%`; },
 
     // ════════════════════════════════════════════════════════════════
     // POSITION PERSISTENCE

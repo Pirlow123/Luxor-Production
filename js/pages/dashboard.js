@@ -559,7 +559,38 @@ const DashboardPage = {
                 </div>
             </div>`;
 
+        const totalDevices = servers.length + ledProcs.length + ptzCams.length + netSwitches.length + lightConsoles.length + intercoms.length;
+
         return `
+            <div class="dash-topo-section">
+                <div class="dash-topo-header">
+                    <div style="display:flex;align-items:center;gap:10px;">
+                        <i class="fas fa-project-diagram" style="color:var(--blue);font-size:16px;"></i>
+                        <span style="font-weight:700;font-size:14px;letter-spacing:0.5px;">TOPOLOGY MAP</span>
+                        <span style="font-size:11px;color:var(--text-muted);">${totalDevices} devices</span>
+                    </div>
+                    <div style="display:flex;gap:6px;align-items:center;">
+                        <button class="btn btn-sm btn-ghost" onclick="TopologyPage._autoLayout()" title="Auto Layout"><i class="fas fa-magic"></i></button>
+                        <button class="btn btn-sm btn-ghost" onclick="TopologyPage._fitView()" title="Fit View"><i class="fas fa-compress-arrows-alt"></i></button>
+                        <button class="btn btn-sm btn-ghost" onclick="TopologyPage.syncDevices()" title="Refresh"><i class="fas fa-sync"></i></button>
+                        <button class="btn btn-sm" onclick="HippoApp.navigate('topology')" title="Open Full View"><i class="fas fa-expand"></i> Full View</button>
+                    </div>
+                </div>
+                <div class="dash-topo-canvas-wrap" id="dash-topo-wrap">
+                    <canvas id="dash-topo-canvas" class="dash-topo-canvas"></canvas>
+                    <div id="dash-topo-info" class="topo-info-panel" style="display:none"></div>
+                    <div class="dash-topo-legend">
+                        <div class="topo-legend-item"><div class="topo-legend-dot" style="background:#4ade80"></div> Online</div>
+                        <div class="topo-legend-item"><div class="topo-legend-dot" style="background:#f87171"></div> Offline</div>
+                        <div class="topo-legend-item"><div class="topo-legend-dot" style="background:#38bdf8"></div> Server</div>
+                        <div class="topo-legend-item"><div class="topo-legend-dot" style="background:#a78bfa"></div> Processor</div>
+                        <div class="topo-legend-item"><div class="topo-legend-dot" style="background:#fbbf24"></div> Camera</div>
+                        <div class="topo-legend-item"><div class="topo-legend-dot" style="background:#34d399"></div> Switch</div>
+                        <div class="topo-legend-item"><div class="topo-legend-dot" style="background:#f472b6"></div> Lighting</div>
+                        <div class="topo-legend-item"><div class="topo-legend-dot" style="background:#fb923c"></div> Intercom</div>
+                    </div>
+                </div>
+            </div>
             <div class="dash-grid">
                 ${catCard('fa-server', 'Media Servers', 'dashboard', serverItems, servers.length, 'HippoApp.showAddServer()')}
                 ${catCard('fa-microchip', 'Processors', 'ledprocessor', procItems, ledProcs.length, 'HippoApp.showAddLedProcessor()')}
@@ -1356,6 +1387,8 @@ const DashboardPage = {
         if (!appState.get('connected')) {
             // Home dashboard — start fast refresh to keep device info updated
             this._startHomeRefresh();
+            // Init the embedded topology canvas after DOM renders
+            setTimeout(() => this._initDashTopo(), 60);
             return;
         }
         // Fetch mix levels
@@ -1383,6 +1416,7 @@ const DashboardPage = {
     onDeactivate() {
         this._cleanup3D();
         this._stopHomeRefresh();
+        this._stopDashTopo();
     },
 
     _startHomeRefresh() {
@@ -1397,6 +1431,84 @@ const DashboardPage = {
             clearInterval(this._homeRefreshTimer);
             this._homeRefreshTimer = null;
         }
+    },
+
+    // ════════════════════════════════════════════════════════════════
+    // EMBEDDED TOPOLOGY — reuses TopologyPage engine on the dashboard canvas
+    // ════════════════════════════════════════════════════════════════
+    _dashTopoActive: false,
+    _dashTopoFrame: null,
+    _dashTopoTimer: null,
+
+    _initDashTopo() {
+        const canvas = document.getElementById('dash-topo-canvas');
+        if (!canvas) return;
+        this._dashTopoActive = true;
+
+        // Swap TopologyPage to use dashboard canvas elements
+        TopologyPage._canvas = canvas;
+        TopologyPage._ctx = canvas.getContext('2d');
+        TopologyPage._selectedNode = null;
+        TopologyPage._hoveredNode = null;
+
+        // Size canvas
+        const wrap = document.getElementById('dash-topo-wrap');
+        const dpr = window.devicePixelRatio || 1;
+        canvas.width = wrap.clientWidth * dpr;
+        canvas.height = wrap.clientHeight * dpr;
+        canvas.style.width = wrap.clientWidth + 'px';
+        canvas.style.height = wrap.clientHeight + 'px';
+        TopologyPage._ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+        // Override info panel target for dashboard
+        TopologyPage._infoPanelId = 'dash-topo-info';
+        TopologyPage._zoomInfoId = 'dash-topo-zoom';
+
+        // Bind mouse events
+        canvas.addEventListener('mousedown', (e) => TopologyPage._onMouseDown(e));
+        canvas.addEventListener('mousemove', (e) => TopologyPage._onMouseMove(e));
+        canvas.addEventListener('mouseup', (e) => TopologyPage._onMouseUp(e));
+        canvas.addEventListener('mouseleave', (e) => TopologyPage._onMouseUp(e));
+        canvas.addEventListener('wheel', (e) => TopologyPage._onWheel(e));
+        canvas.addEventListener('dblclick', (e) => TopologyPage._onDblClick(e));
+
+        // Resize handler
+        this._dashTopoResize = () => {
+            if (!this._dashTopoActive) return;
+            const w = wrap.clientWidth, h = wrap.clientHeight, d = window.devicePixelRatio || 1;
+            canvas.width = w * d; canvas.height = h * d;
+            canvas.style.width = w + 'px'; canvas.style.height = h + 'px';
+            TopologyPage._ctx.setTransform(d, 0, 0, d, 0, 0);
+        };
+        window.addEventListener('resize', this._dashTopoResize);
+
+        // Sync devices + start rendering
+        TopologyPage.syncDevices();
+        if (TopologyPage._nodes.length > 0 && !TopologyPage._pan.x && !TopologyPage._pan.y) {
+            setTimeout(() => TopologyPage._fitView(), 100);
+        }
+
+        const renderLoop = () => {
+            if (!this._dashTopoActive) return;
+            TopologyPage._render();
+            this._dashTopoFrame = requestAnimationFrame(renderLoop);
+        };
+        this._dashTopoFrame = requestAnimationFrame(renderLoop);
+
+        // Periodic device sync
+        this._dashTopoTimer = setInterval(() => {
+            if (this._dashTopoActive) TopologyPage.syncDevices();
+        }, 5000);
+    },
+
+    _stopDashTopo() {
+        this._dashTopoActive = false;
+        if (this._dashTopoFrame) { cancelAnimationFrame(this._dashTopoFrame); this._dashTopoFrame = null; }
+        if (this._dashTopoTimer) { clearInterval(this._dashTopoTimer); this._dashTopoTimer = null; }
+        if (this._dashTopoResize) { window.removeEventListener('resize', this._dashTopoResize); this._dashTopoResize = null; }
+        // Reset TopologyPage overrides
+        TopologyPage._infoPanelId = null;
+        TopologyPage._zoomInfoId = null;
     },
 
     async _pollAllServers() {

@@ -192,8 +192,67 @@
 .text-orange { color: var(--orange); }
 .text-red { color: var(--red); }
 
-@media (max-width: 1200px) { .dash-grid { grid-template-columns: repeat(2, 1fr); } }
-@media (max-width: 700px) { .dash-grid { grid-template-columns: 1fr; } }
+/* Dashboard Topology Embed */
+.dash-topo-section {
+    margin-bottom: 18px;
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    background: #0a0a0f;
+    overflow: hidden;
+}
+.dash-topo-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 16px;
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border);
+}
+.dash-topo-canvas-wrap {
+    position: relative;
+    height: 380px;
+    overflow: hidden;
+    cursor: grab;
+}
+.dash-topo-canvas-wrap.dragging { cursor: grabbing; }
+.dash-topo-canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+.dash-topo-legend {
+    position: absolute;
+    bottom: 8px;
+    left: 8px;
+    display: flex;
+    gap: 12px;
+    background: rgba(15,15,20,0.85);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 6px 12px;
+    font-size: 9px;
+    backdrop-filter: blur(8px);
+}
+.dash-topo-section .topo-info-panel {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 240px;
+    background: rgba(15,15,20,0.92);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 12px;
+    font-size: 11px;
+    backdrop-filter: blur(8px);
+}
+.dash-topo-section .topo-info-panel h4 { font-size: 12px; margin: 0 0 8px; display: flex; align-items: center; gap: 6px; }
+.dash-topo-section .topo-info-row { display: flex; justify-content: space-between; padding: 2px 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
+.dash-topo-section .topo-info-row:last-child { border-bottom: none; }
+.dash-topo-section .topo-legend-item { display: flex; align-items: center; gap: 4px; color: var(--text-secondary); }
+.dash-topo-section .topo-legend-dot { width: 8px; height: 8px; border-radius: 50%; }
+
+@media (max-width: 1200px) { .dash-grid { grid-template-columns: repeat(2, 1fr); } .dash-topo-canvas-wrap { height: 300px; } }
+@media (max-width: 700px) { .dash-grid { grid-template-columns: 1fr; } .dash-topo-canvas-wrap { height: 250px; } }
 
 @media (max-width: 1400px) { .dashboard-stats { grid-template-columns: repeat(2, 1fr); } }
 @media (max-width: 900px) { .dashboard-panels { grid-template-columns: 1fr; } .dashboard-stats { grid-template-columns: 1fr; } }
