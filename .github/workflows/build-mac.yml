@@ -45,13 +45,20 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Find the latest release tag
+          # Get version from package.json to find the correct release tag
           if [ "${{ github.event_name }}" = "release" ]; then
             TAG="${{ github.event.release.tag_name }}"
           else
-            TAG=$(gh release list --limit 1 --json tagName -q '.[0].tagName')
+            VERSION=$(node -p "require('./package.json').version")
+            TAG="v${VERSION}"
           fi
           echo "Uploading to release: $TAG"
+
+          # Verify the release exists
+          if ! gh release view "$TAG" > /dev/null 2>&1; then
+            echo "Release $TAG not found, skipping upload"
+            exit 0
+          fi
 
           # Upload DMG, zip, and latest-mac.yml
           for f in release/*.dmg release/*.zip; do
