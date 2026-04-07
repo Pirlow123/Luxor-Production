@@ -47,6 +47,7 @@ const HippoApp = {
         sacnmonitor:  SacnMonitorPage,
         showclock:    ShowClockPage,
         specifications: SpecificationsPage,
+        topology:     TopologyPage,
         enginemedia:  EngineMediaPage,
         enginemixing: EngineMixingPage,
         settings:     SettingsPage,
