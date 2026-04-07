@@ -9,6 +9,14 @@ contextBridge.exposeInMainWorld('luxorUpdater', {
     onStatus: (callback) => ipcRenderer.on('updater-status', (_, data) => callback(data)),
 });
 
+// Broadweigh Load Cell Bridge API
+contextBridge.exposeInMainWorld('luxorBroadweigh', {
+    start: () => ipcRenderer.invoke('broadweigh-start'),
+    stop: () => ipcRenderer.invoke('broadweigh-stop'),
+    command: (cmd) => ipcRenderer.invoke('broadweigh-command', cmd),
+    onData: (callback) => ipcRenderer.on('broadweigh-data', (_, data) => callback(data)),
+});
+
 contextBridge.exposeInMainWorld('luxorProject', {
     save: (filePath, data) => ipcRenderer.invoke('save-project', { path: filePath, data }),
     getPath: () => ipcRenderer.invoke('get-project-path'),

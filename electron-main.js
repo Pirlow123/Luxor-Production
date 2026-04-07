@@ -1,5 +1,6 @@
 const { app, BrowserWindow, Menu, dialog, ipcMain } = require('electron');
 const { autoUpdater } = require('electron-updater');
+const { spawn } = require('child_process');
 const path = require('path');
 const fs = require('fs');
 
@@ -218,6 +219,122 @@ ipcMain.handle('export-file', async (event, { defaultName, content, filters }) =
         }
     }
     return { ok: false, canceled: true };
+});
+
+// ================================================================
+// BROADWEIGH LOAD CELL BRIDGE (Python subprocess)
+// ================================================================
+let broadweighProcess = null;
+
+ipcMain.handle('broadweigh-start', async () => {
+    if (broadweighProcess) {
+        return { ok: true, message: 'Already running' };
+    }
+
+    // Find Python executable
+    const pythonCandidates = ['python', 'python3', 'py'];
+    let pythonExe = null;
+    for (const candidate of pythonCandidates) {
+        try {
+            const { execSync } = require('child_process');
+            execSync(`${candidate} --version`, { timeout: 3000, stdio: 'ignore' });
+            pythonExe = candidate;
+            break;
+        } catch {}
+    }
+
+    if (!pythonExe) {
+        return { ok: false, error: 'Python not found. Install Python 3.x to use load cell monitoring.' };
+    }
+
+    const bridgePath = path.join(__dirname, 'tools', 'broadweigh', 'bridge.py');
+    if (!fs.existsSync(bridgePath)) {
+        return { ok: false, error: 'Bridge script not found at: ' + bridgePath };
+    }
+
+    try {
+        broadweighProcess = spawn(pythonExe, [bridgePath], {
+            cwd: path.join(__dirname, 'tools', 'broadweigh'),
+            stdio: ['pipe', 'pipe', 'pipe'],
+        });
+
+        let buffer = '';
+        broadweighProcess.stdout.on('data', (chunk) => {
+            buffer += chunk.toString();
+            const lines = buffer.split('\n');
+            buffer = lines.pop(); // keep incomplete line
+            for (const line of lines) {
+                if (line.trim()) {
+                    try {
+                        const data = JSON.parse(line.trim());
+                        if (mainWindow && !mainWindow.isDestroyed()) {
+                            mainWindow.webContents.send('broadweigh-data', data);
+                        }
+                    } catch {}
+                }
+            }
+        });
+
+        broadweighProcess.stderr.on('data', (chunk) => {
+            const msg = chunk.toString().trim();
+            if (msg && mainWindow && !mainWindow.isDestroyed()) {
+                mainWindow.webContents.send('broadweigh-data', { type: 'error', message: msg });
+            }
+        });
+
+        broadweighProcess.on('exit', (code) => {
+            broadweighProcess = null;
+            if (mainWindow && !mainWindow.isDestroyed()) {
+                mainWindow.webContents.send('broadweigh-data', { type: 'status', connected: false, reason: `Process exited (code ${code})` });
+            }
+        });
+
+        broadweighProcess.on('error', (err) => {
+            broadweighProcess = null;
+            if (mainWindow && !mainWindow.isDestroyed()) {
+                mainWindow.webContents.send('broadweigh-data', { type: 'error', message: err.message });
+            }
+        });
+
+        return { ok: true };
+    } catch (e) {
+        broadweighProcess = null;
+        return { ok: false, error: e.message };
+    }
+});
+
+ipcMain.handle('broadweigh-stop', () => {
+    if (broadweighProcess) {
+        try { broadweighProcess.stdin.write(JSON.stringify({ cmd: 'quit' }) + '\n'); } catch {}
+        setTimeout(() => {
+            if (broadweighProcess) {
+                try { broadweighProcess.kill(); } catch {}
+                broadweighProcess = null;
+            }
+        }, 2000);
+    }
+    return { ok: true };
+});
+
+ipcMain.handle('broadweigh-command', (event, cmd) => {
+    if (broadweighProcess && broadweighProcess.stdin.writable) {
+        try {
+            broadweighProcess.stdin.write(JSON.stringify(cmd) + '\n');
+            return { ok: true };
+        } catch (e) {
+            return { ok: false, error: e.message };
+        }
+    }
+    return { ok: false, error: 'Bridge not running' };
+});
+
+// Clean up on app quit
+app.on('before-quit', () => {
+    if (broadweighProcess) {
+        try { broadweighProcess.stdin.write(JSON.stringify({ cmd: 'quit' }) + '\n'); } catch {}
+        try { broadweighProcess.kill(); } catch {}
+        broadweighProcess = null;
+    }
 });
 
 // ================================================================

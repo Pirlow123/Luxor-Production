@@ -22,6 +22,7 @@ const HippoApp = {
         ledcalc:      LedCalcPage,
         ledsetup:     LedSetupPage,
         ptz:          PtzPage,
+        loadcell:     LoadCellPage,
         netswitch:    NetSwitchPage,
         lighting:     LightingPage,
         intercom:     IntercomPage,

@@ -19,7 +19,8 @@
   },
   "devDependencies": {
     "electron": "^33.4.11",
-    "electron-builder": "^25.1.8"
+    "electron-builder": "^25.1.8",
+    "pdf-parse": "^2.4.5"
   },
   "build": {
     "appId": "com.luxor.production",
@@ -35,6 +36,9 @@
       "js/**/*",
       "assets/**/*",
       "mock-server.js",
+      "tools/broadweigh/bridge.py",
+      "tools/broadweigh/T24_extracted/app/T24AdvDrv64.dll",
+      "tools/broadweigh/T24_extracted/app/T24AdvDrv32.dll",
       "node_modules/ws/**/*",
       "node_modules/xlsx/**/*",
       "node_modules/electron-updater/**/*",
